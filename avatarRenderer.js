@@ -1,11 +1,6 @@
 /**
- * avatarRenderer.js
- *
- * Drop-in module that renders a 2D avatar preview via
- * avatar.roblox.com/v1/avatar/render — no item ownership required.
+ * avatarRenderer.js — renders a 2D avatar via avatar.roblox.com/v1/avatar/render
  */
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const RENDER_ENDPOINT = 'https://avatar.roblox.com/v1/avatar/render';
 const AVATAR_ENDPOINT = 'https://avatar.roblox.com/v1/users/{userId}/avatar';
@@ -14,10 +9,7 @@ const AUTH_ENDPOINT = 'https://users.roblox.com/v1/users/authenticated';
 const POLL_INTERVAL_MS = 800;
 const POLL_MAX_TRIES = 30;
 
-// ─── Module-level state ───────────────────────────────────────────────────────
-
 let activeAbortController = null;
-
 const avatarBaseCache = new Map();
 const renderCache = new Map();
 
@@ -27,34 +19,20 @@ const sleep = (ms, signal) =>
         signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); });
     });
 
-// ─── CSRF helper ─────────────────────────────────────────────────────────────
-
 async function getCsrfToken() {
     const meta = document.querySelector('meta[name="csrf-token"]');
-    if (meta?.content) return meta.content;
-
-    const res = await fetch('https://auth.roblox.com/v2/logout', {
-        method: 'POST',
-        credentials: 'include',
-    });
+    if (meta && meta.content) return meta.content;
+    const res = await fetch('https://auth.roblox.com/v2/logout', { method: 'POST', credentials: 'include' });
     const token = res.headers.get('x-csrf-token');
     if (token) return token;
-
     throw new Error('Could not obtain CSRF token — are you logged into Roblox?');
 }
 
-// ─── Avatar data fetcher ──────────────────────────────────────────────────────
-
 async function fetchAvatarBase(userId) {
     if (avatarBaseCache.has(userId)) return avatarBaseCache.get(userId);
-
-    const res = await fetch(
-        AVATAR_ENDPOINT.replace('{userId}', userId),
-        { credentials: 'include' }
-    );
+    const res = await fetch(AVATAR_ENDPOINT.replace('{userId}', userId), { credentials: 'include' });
     if (!res.ok) throw new Error(`Avatar fetch failed: ${res.status}`);
     const data = await res.json();
-
     avatarBaseCache.set(userId, data);
     return data;
 }
@@ -64,15 +42,6 @@ function clearAvatarBaseCache(userId) {
     else avatarBaseCache.clear();
 }
 window.clearAvatarBaseCache = clearAvatarBaseCache;
-
-async function getLoggedInUserId() {
-    const res = await fetch(AUTH_ENDPOINT, { credentials: 'include' });
-    if (!res.ok) throw new Error('Not logged in');
-    const data = await res.json();
-    return data.id;
-}
-
-// ─── BrickColor → hex ────────────────────────────────────────────────────────
 
 const BRICK_COLOR_HEX = {
     1: '#f2f3f3', 2: '#a1a5a2', 3: '#f9e999', 5: '#d7c59a',
@@ -140,12 +109,8 @@ function toHex(value) {
 
 function convertBodyColors(bodyColors) {
     if (!bodyColors) return {
-        headColor: '#f5cda3',
-        torsoColor: '#f5cda3',
-        rightArmColor: '#f5cda3',
-        leftArmColor: '#f5cda3',
-        rightLegColor: '#f5cda3',
-        leftLegColor: '#f5cda3',
+        headColor: '#f5cda3', torsoColor: '#f5cda3', rightArmColor: '#f5cda3',
+        leftArmColor: '#f5cda3', rightLegColor: '#f5cda3', leftLegColor: '#f5cda3',
     };
     return {
         headColor: toHex(bodyColors.headColor ?? bodyColors.headColorId),
@@ -157,15 +122,8 @@ function convertBodyColors(bodyColors) {
     };
 }
 
-// ─── Core renderer ────────────────────────────────────────────────────────────
-
 function buildAvatarDefinition(base, larpIds, { replaceWornItems = false } = {}) {
-    const baseAssets = replaceWornItems
-        ? []
-        : (base.assets || []).map(a => ({ id: a.id }));
-
-    const larpAssets = larpIds.map(id => ({ id }));
-
+    const baseAssets = replaceWornItems ? [] : (base.assets || []).map(a => ({ id: a.id }));
     return {
         scales: {
             head: base.scales?.head ?? 1,
@@ -176,19 +134,13 @@ function buildAvatarDefinition(base, larpIds, { replaceWornItems = false } = {})
             proportion: base.scales?.proportion ?? 0,
         },
         bodyColors: convertBodyColors(base.bodyColors),
-        playerAvatarType: {
-            playerAvatarType: base.playerAvatarType ?? 'R15',
-        },
-        assets: [...baseAssets, ...larpAssets],
+        playerAvatarType: { playerAvatarType: base.playerAvatarType ?? 'R15' },
+        assets: [...baseAssets, ...larpIds.map(id => ({ id }))],
     };
 }
 
-// CHANGED: userId is now part of the key so two different users with the
-// same (empty) asset list don't collide.
 function makeCacheKey(userId, assetIds, replaceWornItems, bodyColors) {
-    const colorStr = bodyColors
-        ? Object.values(bodyColors).join(',')
-        : '';
+    const colorStr = bodyColors ? Object.values(bodyColors).join(',') : '';
     return userId + '|' + [...assetIds].sort().join(',') + '|' + colorStr + (replaceWornItems ? ':replace' : '');
 }
 
@@ -227,36 +179,25 @@ async function postRenderAndPoll(avatarDefinition, size, signal) {
 
     for (let i = 0; i < POLL_MAX_TRIES; i++) {
         await sleep(POLL_INTERVAL_MS, signal);
-
         const pollRes = await doPost(csrf);
         if (!pollRes.ok) continue;
-
         const data = await pollRes.json();
         if (data.state === 'Completed' && data.imageUrl) return data.imageUrl;
         if (data.state === 'Error') throw new Error('Roblox render failed server-side');
     }
 
-    throw new Error('Render timed out — Roblox servers may be slow, try again');
+    throw new Error('Render timed out — try again');
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
 async function renderAvatarWithItems({
-    userId,
-    assetIds,
-    size = '420x420',
-    replaceWornItems = false,
-    bodyColors = null,
-    onStateChange = null,
+    userId, assetIds, size = '420x420',
+    replaceWornItems = false, bodyColors = null, onStateChange = null,
 }) {
     if (activeAbortController) activeAbortController.abort();
     const controller = new AbortController();
     activeAbortController = controller;
     const { signal } = controller;
-
-    const notify = (state, msg) => {
-        if (!signal.aborted) onStateChange?.(state, msg);
-    };
+    const notify = (s, msg) => { if (!signal.aborted) onStateChange?.(s, msg); };
 
     try {
         const cacheKey = makeCacheKey(userId, assetIds, replaceWornItems, bodyColors);
@@ -266,15 +207,9 @@ async function renderAvatarWithItems({
             return cached;
         }
 
-        notify('loading', 'Fetching avatar data…');
-
-        if (bodyColors) {
-            if (typeof clearAvatarBaseCache === 'function') clearAvatarBaseCache(userId);
-            else avatarBaseCache.delete(userId);
-        }
+        if (bodyColors) clearAvatarBaseCache(userId);
 
         const base = await fetchAvatarBase(userId);
-
         if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
         const convertedOverride = bodyColors ? {
@@ -291,14 +226,11 @@ async function renderAvatarWithItems({
             : base;
 
         const definition = buildAvatarDefinition(mergedBase, assetIds, { replaceWornItems });
-
-        notify('polling', 'Rendering…');
         const imageUrl = await postRenderAndPoll(definition, size, signal);
 
         renderCache.set(cacheKey, imageUrl);
         notify('done', imageUrl);
         return imageUrl;
-
     } catch (err) {
         if (err.name === 'AbortError') return;
         notify('error', err.message);
@@ -308,17 +240,5 @@ async function renderAvatarWithItems({
     }
 }
 
-function clearRenderCache() {
-    renderCache.clear();
-}
+function clearRenderCache() { renderCache.clear(); }
 window.clearRenderCache = clearRenderCache;
-
-async function renderCustomAvatar(avatarDefinition, size = '420x420') {
-    const controller = new AbortController();
-    return postRenderAndPoll(avatarDefinition, size, controller.signal);
-}
-
-async function getCurrentlyWornAssetIds(userId) {
-    const base = await fetchAvatarBase(userId);
-    return (base.assets || []).map(a => a.id);
-}

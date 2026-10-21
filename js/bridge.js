@@ -3,13 +3,13 @@
 const LARP_KEYS = [
     'fakeRobux', 'inventory', 'equipped', 'transactions',
     'larpDisplayName', 'larpUsername', 'larpFollowers', 'larpFollowing',
-    'larpFriends', 'larpBio', 'larpTarget', 'larpBodyColors', 'uiMode'
+    'larpFriends', 'larpBio', 'larpTarget', 'larpId', 'larpBodyColors', 'uiMode'
 ];
 
 function larpBuildConfig(r) {
     const inv = r.inventory || [];
-    const target = r.larpTarget || null;
-    const targetActive = !!(target && r.larpId && String(r.larpId) === String(target.id));
+    const t = r.larpTarget || null;
+    const on = !!(t && r.larpId && String(r.larpId) === String(t.id));
 
     return {
         enabled: r.uiMode !== 'off',
@@ -18,22 +18,32 @@ function larpBuildConfig(r) {
         displayName: r.larpDisplayName || '',
         username: r.larpUsername || '',
         bio: r.larpBio ?? null,
+        created: (t && t.created) || null,
+        hasVerifiedBadge: t ? !!t.hasVerifiedBadge : null,
+        premium: t && t.premium != null ? !!t.premium : null,
         followers: r.larpFollowers ?? null,
         following: r.larpFollowing ?? null,
         friends: r.larpFriends ?? null,
-        equippedIds: targetActive ? [] : inv.filter((i) => i.equipped && i.assetId).map((i) => Number(i.assetId)),
+        equippedIds: on ? [] : inv.filter((i) => i.equipped && i.assetId).map((i) => Number(i.assetId)),
         bodyColors: r.larpBodyColors || null,
         transactions: r.transactions || [],
         inventory: inv,
         avatarUrl: window.__larpAvatarUrl || null,
-        headshotUrl: (target && target.headshot) || null,
-        bustUrl: (target && target.bust) || null,
+        headshotUrl: (t && t.headshot) || null,
+        bustUrl: (t && t.bust) || null,
 
-        replaceAssets: targetActive,
-        targetAssets: targetActive ? ((target.avatar && target.avatar.assets) || []) : [],
-        targetBodyColors: targetActive ? ((target.avatar && target.avatar.bodyColors) || null) : null,
-        targetScales: targetActive ? ((target.avatar && target.avatar.scales) || null) : null,
-        targetAvatarType: targetActive ? ((target.avatar && target.avatar.playerAvatarType) || null) : null
+        replaceAssets: on,
+        targetAssets: on ? ((t.avatar && t.avatar.assets) || []) : [],
+        targetBodyColors: on ? ((t.avatar && t.avatar.bodyColors) || null) : null,
+        targetScales: on ? ((t.avatar && t.avatar.scales) || null) : null,
+        targetAvatarType: on ? ((t.avatar && t.avatar.playerAvatarType) || null) : null,
+
+        badges: (t && t.badges) || null,
+        socialLinks: (t && t.socialLinks) || null,
+        primaryGroup: (t && t.primaryGroup) || null,
+        usernameHistory: (t && t.usernameHistory) || null,
+        presence: (t && t.presence) || null,
+        targetFriends: (t && t.friends) || null
     };
 }
 

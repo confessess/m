@@ -10,9 +10,9 @@ var state = {
     larpBio: null,
     larpDisplayName: '',
     larpUsername: '',
-    larpFollowers: 0,
-    larpFollowing: 0,
-    larpFriends: 0,
+    larpFollowers: null,
+    larpFollowing: null,
+    larpFriends: null,
     realUserId: null,
     uiMode: 'auto'
 };

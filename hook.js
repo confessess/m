@@ -5,42 +5,31 @@
     window.__LARP_HOOK__ = true;
 
     const cfg = {
-        enabled: true,
-        myId: null,
-        robux: null,
-        displayName: '',
-        username: '',
-        bio: null,
-        followers: null,
-        following: null,
-        friends: null,
-        avatarUrl: null,
-        headshotUrl: null,
-        bustUrl: null,
-        equippedIds: [],
-        bodyColors: null,
-        transactions: [],
-        inventory: [],
-        replaceAssets: false,
-        targetAssets: [],
-        targetBodyColors: null,
-        targetScales: null,
-        targetAvatarType: null
+        enabled: true, myId: null,
+        robux: null, displayName: '', username: '', bio: null, created: null,
+        hasVerifiedBadge: null, premium: null,
+        followers: null, following: null, friends: null,
+        avatarUrl: null, headshotUrl: null, bustUrl: null,
+        equippedIds: [], bodyColors: null,
+        transactions: [], inventory: [],
+        replaceAssets: false, targetAssets: [],
+        targetBodyColors: null, targetScales: null, targetAvatarType: null,
+        badges: null, socialLinks: null, primaryGroup: null,
+        usernameHistory: null, presence: null, targetFriends: null
     };
 
     try { Object.assign(cfg, JSON.parse(localStorage.getItem('__larp_cfg') || '{}')); } catch (e) { }
 
     window.addEventListener('message', (e) => {
-        if (e.source !== window) return;
         const d = e.data;
         if (!d || d.__larp !== true) return;
+        if (e.source && e.source !== window) return;
         if (d.type === 'LARP_CONFIG') {
             Object.assign(cfg, d.payload || {});
             try { localStorage.setItem('__larp_cfg', JSON.stringify(cfg)); } catch (e) { }
         }
     });
 
-    // ── helpers ───────────────────────────────────────────────────────
     const uidOf = (u) => { const m = u.match(/\/users\/(\d+)/); return m ? m[1] : null; };
     const isMe = (u) => { const id = uidOf(u); return !!(id && cfg.myId && id === String(cfg.myId)); };
     const isMeOrUnknown = (u) => !cfg.myId || isMe(u);
@@ -50,9 +39,10 @@
         if (!o || typeof o !== 'object') return false;
         let c = false;
         if (cfg.username && 'name' in o && o.name !== cfg.username) { o.name = cfg.username; c = true; }
-        if (cfg.displayName && 'displayName' in o && o.displayName !== cfg.displayName) {
-            o.displayName = cfg.displayName; c = true;
-        }
+        if (cfg.displayName && 'displayName' in o && o.displayName !== cfg.displayName) { o.displayName = cfg.displayName; c = true; }
+        if (cfg.hasVerifiedBadge != null && 'hasVerifiedBadge' in o) { o.hasVerifiedBadge = cfg.hasVerifiedBadge; c = true; }
+        if (cfg.created && 'created' in o && o.created !== cfg.created) { o.created = cfg.created; c = true; }
+        if (cfg.bio != null && 'description' in o && o.description !== cfg.bio) { o.description = cfg.bio; c = true; }
         return c;
     }
 
@@ -79,25 +69,45 @@
         return c;
     }
 
-    // ── rules ─────────────────────────────────────────────────────────
+    function applyAvatarDefinition(j) {
+        if (cfg.replaceAssets && cfg.targetAssets.length) {
+            j.assets = cfg.targetAssets.map((a) => ({
+                id: a.id, name: a.name,
+                assetType: a.assetType || { id: 0, name: 'Asset' },
+                currentVersionId: a.currentVersionId ?? null, meta: a.meta ?? null
+            }));
+            if (cfg.targetBodyColors) j.bodyColors = { ...j.bodyColors, ...cfg.targetBodyColors };
+            if (cfg.targetScales) j.scales = { ...j.scales, ...cfg.targetScales };
+            if (cfg.targetAvatarType) j.playerAvatarType = cfg.targetAvatarType;
+            return true;
+        }
+        let c = false;
+        if (cfg.equippedIds && cfg.equippedIds.length) {
+            const have = new Set((j.assets || []).map((a) => a.id));
+            const add = cfg.equippedIds.filter((id) => !have.has(id))
+                .map((id) => ({ id, name: 'Larped', assetType: { id: 0, name: 'Larp' } }));
+            if (add.length) { j.assets = [...(j.assets || []), ...add]; c = true; }
+        }
+        if (cfg.bodyColors) { j.bodyColors = { ...j.bodyColors, ...cfg.bodyColors }; c = true; }
+        return c;
+    }
+
     const RULES = [
         {
             match: /^https:\/\/users\.roblox\.com\/v1\/users\/authenticated/,
-            rewrite(j) {
-                if (!cfg.myId && j.id) cfg.myId = j.id;
-                let c = false;
-                if (cfg.bio != null && j.description !== cfg.bio) { j.description = cfg.bio; c = true; }
-                return rename(j) || c ? j : null;
-            }
+            rewrite(j) { if (!cfg.myId && j.id) cfg.myId = j.id; return rename(j) ? j : null; }
+        },
+        {
+            match: /^https:\/\/users\.roblox\.com\/v1\/users\/\d+\/description/,
+            rewrite(j) { if (cfg.bio == null) return null; j.description = cfg.bio; return j; }
+        },
+        {
+            match: /^https:\/\/users\.roblox\.com\/v1\/users\/\d+\/username-history/,
+            rewrite(j) { return cfg.usernameHistory ? (j.data = cfg.usernameHistory, j) : null; }
         },
         {
             match: /^https:\/\/users\.roblox\.com\/v1\/users\/\d+(?:[?#]|$)/,
-            rewrite(j, url) {
-                if (!isMe(url)) return null;
-                let c = false;
-                if (cfg.bio != null && j.description !== cfg.bio) { j.description = cfg.bio; c = true; }
-                return rename(j) || c ? j : null;
-            }
+            rewrite(j, url) { return isMe(url) && rename(j) ? j : null; }
         },
         {
             match: /^https:\/\/www\.roblox\.com\/mobileapi\/userinfo/,
@@ -120,6 +130,22 @@
             rewrite(j) { return renameInList(j.data, 'user') ? j : null; }
         },
         {
+            match: /^https:\/\/accountinformation\.roblox\.com\/v1\/users\/\d+\/roblox-badges/,
+            rewrite(j) { return cfg.badges ? (j = cfg.badges) : null; }
+        },
+        {
+            match: /^https:\/\/accountinformation\.roblox\.com\/v1\/users\/\d+\/promotion-channels/,
+            rewrite(j) { return cfg.socialLinks ? Object.assign(j, cfg.socialLinks) : null; }
+        },
+        {
+            match: /^https:\/\/premiumfeatures\.roblox\.com\/v1\/users\/\d+\/validate-membership/,
+            rewrite(j) { return cfg.premium == null ? null : cfg.premium; }
+        },
+        {
+            match: /^https:\/\/groups\.roblox\.com\/v1\/users\/\d+\/groups\/primary\/role/,
+            rewrite(j) { return cfg.primaryGroup ? Object.assign(j, cfg.primaryGroup) : null; }
+        },
+        {
             match: /^https:\/\/economy\.roblox\.com\/v1\/users\/\d+\/currency/,
             rewrite(j) { if (cfg.robux == null) return null; j.robux = cfg.robux; return j; }
         },
@@ -127,39 +153,15 @@
             match: /^https:\/\/www\.roblox\.com\/my\/money\.aspx\/getbalance/,
             rewrite(j) { if (cfg.robux == null) return null; j.balance = cfg.robux; return j; }
         },
-
-        // counts — only for your own profile
-        {
-            match: /followers\/count/,
-            rewrite(j, url) {
-                if (!isMeOrUnknown(url)) return null;
-                if (cfg.followers == null) return null;
-                j.count = cfg.followers;
-                return j;
-            }
-        },
-        {
-            match: /followings\/count/,
-            rewrite(j, url) {
-                if (!isMeOrUnknown(url)) return null;
-                if (cfg.following == null) return null;
-                j.count = cfg.following;
-                return j;
-            }
-        },
-        {
-            match: /\/friends\/count/,
-            rewrite(j, url) {
-                if (!isMeOrUnknown(url)) return null;
-                if (cfg.friends == null) return null;
-                j.count = cfg.friends;
-                return j;
-            }
-        },
-
+        { match: /followers\/count/, rewrite(j, u) { return (!isMeOrUnknown(u) || cfg.followers == null) ? null : (j.count = cfg.followers, j); } },
+        { match: /followings\/count/, rewrite(j, u) { return (!isMeOrUnknown(u) || cfg.following == null) ? null : (j.count = cfg.following, j); } },
+        { match: /\/friends\/count/, rewrite(j, u) { return (!isMeOrUnknown(u) || cfg.friends == null) ? null : (j.count = cfg.friends, j); } },
         {
             match: /^https:\/\/friends\.roblox\.com\/v1\/users\/\d+\/(friends|followers|followings)(?:[?#]|$)/,
-            rewrite(j) { return renameInList(j.data, 'user') ? j : null; }
+            rewrite(j, url) {
+                if (/\/friends(?:[?#]|$)/.test(url) && cfg.targetFriends) { j.data = cfg.targetFriends; return j; }
+                return renameInList(j.data, 'user') ? j : null;
+            }
         },
         {
             match: /^https:\/\/groups\.roblox\.com\/v\d+\/groups\/\d+\/users/,
@@ -167,54 +169,45 @@
         },
         {
             match: /^https:\/\/presence\.roblox\.com\/v1\/presence\/users/,
-            rewrite(j) { return renameInList(j.userPresences, 'user') ? j : null; }
-        },
-        {
-            match: /^https:\/\/thumbnails\.roblox\.com\/v1\/users\/avatar\?/,
-            rewrite(j) { return swapThumb(j.data, cfg.avatarUrl) ? j : null; }
-        },
-        {
-            match: /^https:\/\/thumbnails\.roblox\.com\/v1\/users\/avatar-headshot\?/,
-            rewrite(j) { return swapThumb(j.data, cfg.headshotUrl) ? j : null; }
-        },
-        {
-            match: /^https:\/\/thumbnails\.roblox\.com\/v1\/users\/avatar-bust\?/,
-            rewrite(j) { return swapThumb(j.data, cfg.bustUrl) ? j : null; }
-        },
-
-        // avatar definition — replaces the whole worn list when a target is active
-        {
-            match: /^https:\/\/avatar\.roblox\.com\/v1\/(?:users\/\d+\/)?avatar(?:[?#]|$)/,
-            rewrite(j, url) {
-                const bare = /\/v1\/avatar(?:[?#]|$)/.test(url);
-                if (!bare && !isMe(url)) return null;
-
-                if (cfg.replaceAssets && cfg.targetAssets.length) {
-                    j.assets = cfg.targetAssets.map((a) => ({
-                        id: a.id,
-                        name: a.name,
-                        assetType: a.assetType || { id: 0, name: 'Asset' },
-                        currentVersionId: a.currentVersionId ?? null,
-                        meta: a.meta ?? null
-                    }));
-                    if (cfg.targetBodyColors) j.bodyColors = { ...j.bodyColors, ...cfg.targetBodyColors };
-                    if (cfg.targetScales) j.scales = { ...j.scales, ...cfg.targetScales };
-                    if (cfg.targetAvatarType) j.playerAvatarType = cfg.targetAvatarType;
-                    return j;
+            rewrite(j) {
+                let c = renameInList(j.userPresences, 'user');
+                if (cfg.presence && Array.isArray(j.userPresences)) {
+                    for (const p of j.userPresences) {
+                        if (!isSelfId(p.userId)) continue;
+                        Object.assign(p, cfg.presence, { userId: p.userId });
+                        c = true;
+                    }
                 }
-
-                let c = false;
-                if (cfg.equippedIds && cfg.equippedIds.length) {
-                    const have = new Set((j.assets || []).map((a) => a.id));
-                    const add = cfg.equippedIds.filter((id) => !have.has(id))
-                        .map((id) => ({ id, name: 'Larped', assetType: { id: 0, name: 'Larp' } }));
-                    if (add.length) { j.assets = [...(j.assets || []), ...add]; c = true; }
-                }
-                if (cfg.bodyColors) { j.bodyColors = { ...j.bodyColors, ...cfg.bodyColors }; c = true; }
                 return c ? j : null;
             }
         },
-
+        { match: /^https:\/\/thumbnails\.roblox\.com\/v1\/users\/avatar\?/, rewrite(j) { return swapThumb(j.data, cfg.avatarUrl) ? j : null; } },
+        { match: /^https:\/\/thumbnails\.roblox\.com\/v1\/users\/avatar-headshot\?/, rewrite(j) { return swapThumb(j.data, cfg.headshotUrl) ? j : null; } },
+        { match: /^https:\/\/thumbnails\.roblox\.com\/v1\/users\/avatar-bust\?/, rewrite(j) { return swapThumb(j.data, cfg.bustUrl) ? j : null; } },
+        {
+            match: /^https:\/\/avatar\.roblox\.com\/v1\/users\/\d+\/currently-wearing/,
+            rewrite(j, url) {
+                if (!isMe(url)) return null;
+                if (cfg.replaceAssets && cfg.targetAssets.length) {
+                    j.assetIds = cfg.targetAssets.map((a) => a.id);
+                    return j;
+                }
+                if (cfg.equippedIds && cfg.equippedIds.length) {
+                    const have = new Set(j.assetIds || []);
+                    j.assetIds = [...(j.assetIds || []), ...cfg.equippedIds.filter((id) => !have.has(id))];
+                    return j;
+                }
+                return null;
+            }
+        },
+        {
+            match: /^https:\/\/avatar\.roblox\.com\/v[14]\/(?:users\/\d+\/)?avatar(?:[?#]|$)/,
+            rewrite(j, url) {
+                const bare = /\/avatar(?:[?#]|$)/.test(url) && !/\/users\//.test(url);
+                if (!bare && !isMe(url)) return null;
+                return applyAvatarDefinition(j) ? j : null;
+            }
+        },
         {
             match: /^https:\/\/inventory\.roblox\.com\/v2\/users\/\d+\/inventory\/(\d+)/,
             rewrite(j, url) {
@@ -233,15 +226,12 @@
             match: /^https:\/\/economy\.roblox\.com\/v2\/users\/\d+\/transactions/,
             rewrite(j) {
                 if (!Array.isArray(j.data) || !cfg.transactions.length) return null;
-                const fake = cfg.transactions.map((t) => ({
-                    id: t.id,
-                    created: t.date,
-                    isPending: false,
+                j.data = [...cfg.transactions.map((t) => ({
+                    id: t.id, created: t.date, isPending: false,
                     agent: { id: 1, name: 'Roblox', type: 'User' },
                     details: { id: 0, name: t.description, type: 'Asset' },
                     currency: { amount: t.amount, type: 'Robux' }
-                }));
-                j.data = [...fake, ...j.data];
+                })), ...j.data];
                 return j;
             }
         },
@@ -249,7 +239,7 @@
             match: /^https:\/\/economy\.roblox\.com\/v2\/users\/\d+\/transaction-totals/,
             rewrite(j) {
                 if (!cfg.transactions.length) return null;
-                const sum = (pred) => cfg.transactions.filter(pred).reduce((a, t) => a + Math.abs(t.amount), 0);
+                const sum = (p) => cfg.transactions.filter(p).reduce((a, t) => a + Math.abs(t.amount), 0);
                 j.purchases = (j.purchases || 0) + sum((t) => t.amount < 0);
                 j.sales = (j.sales || 0) + sum((t) => t.amount > 0);
                 return j;
@@ -259,7 +249,6 @@
 
     const matchRule = (url) => RULES.find((r) => r.match.test(url));
 
-    // ── fetch ─────────────────────────────────────────────────────────
     const origFetch = window.fetch;
     window.fetch = async function (input, init) {
         const res = await origFetch.apply(this, arguments);
@@ -277,7 +266,6 @@
         } catch (e) { return res; }
     };
 
-    // ── XHR ───────────────────────────────────────────────────────────
     const XHRp = XMLHttpRequest.prototype;
     const nativeText = Object.getOwnPropertyDescriptor(XHRp, 'responseText').get;
     const nativeResp = Object.getOwnPropertyDescriptor(XHRp, 'response').get;
@@ -287,7 +275,6 @@
         this.__larpUrl = String(url);
         this.__larpCache = undefined;
         const self = this;
-
         Object.defineProperty(self, 'responseText', {
             configurable: true,
             get() {
@@ -303,7 +290,6 @@
                 return self.__larpCache;
             }
         });
-
         Object.defineProperty(self, 'response', {
             configurable: true,
             get() {
@@ -314,7 +300,6 @@
                 try { return JSON.parse(self.responseText); } catch (e) { return raw; }
             }
         });
-
         return origOpen.apply(this, arguments);
     };
 
@@ -329,5 +314,5 @@
         } else setTimeout(patchService, 500);
     })();
 
-    console.log('[LarpBlox] hook armed (MAIN world)');
+    console.log('[LarpBlox] hook armed v1.4');
 })();

@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const followerInput = document.getElementById('follower-count');
     const invCount = document.getElementById('inv-count');
     const invGrid = document.getElementById('inventory-preview-grid');
-
     const txList = document.getElementById('transaction-list');
     const txDesc = document.getElementById('tx-desc');
     const txType = document.getElementById('tx-type');
@@ -21,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (txDate) txDate.valueAsDate = new Date();
 
-    // Clock
     function updateClock() {
         const now = new Date();
         const h = String(now.getHours()).padStart(2, '0');
@@ -33,14 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Tab switching
     document.querySelectorAll('.frost-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             document.querySelectorAll('.frost-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.frost-panel').forEach(p => p.classList.remove('active'));
             tab.classList.add('active');
-            const panelId = 'panel-' + tab.dataset.tab;
-            const panel = document.getElementById(panelId);
+            const panel = document.getElementById('panel-' + tab.dataset.tab);
             if (panel) panel.classList.add('active');
         });
     });
@@ -64,16 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderInventoryPreview(inventory) {
         if (!invGrid) return;
         invGrid.innerHTML = '';
-        const items = (inventory || []).slice(0, 16);
         if (invCount) invCount.textContent = (inventory || []).length + ' items';
-        items.forEach(item => {
+        (inventory || []).slice(0, 16).forEach(item => {
             const div = document.createElement('div');
             div.className = 'vault-item';
-            if (item.image) {
-                div.innerHTML = `<img src="${item.image}" alt="">`;
-            } else {
-                div.innerHTML = `<span style="color:var(--frost-text-dim);font-size:0.6rem;">?</span>`;
-            }
+            div.innerHTML = item.image
+                ? `<img src="${item.image}" alt="">`
+                : `<span style="color:var(--frost-text-dim);font-size:0.6rem;">?</span>`;
             invGrid.appendChild(div);
         });
     }
@@ -81,19 +74,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTransactions(transactions) {
         if (!txList) return;
         txList.innerHTML = '';
-        const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-        sorted.forEach((t) => {
+        [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((t) => {
             const div = document.createElement('div');
             div.className = 'ledger-entry';
-            const amountColor = t.amount >= 0 ? 'pos' : 'neg';
+            const cls = t.amount >= 0 ? 'pos' : 'neg';
             const sign = t.amount >= 0 ? '+' : '';
             div.innerHTML = `
                 <div>
                     <div class="entry-desc">${t.description}</div>
                     <div class="entry-meta">${t.type} • ${new Date(t.date).toLocaleDateString()}</div>
                 </div>
-                <div class="entry-amount ${amountColor}">${sign}${parseInt(t.amount).toLocaleString()}</div>
-            `;
+                <div class="entry-amount ${cls}">${sign}${parseInt(t.amount).toLocaleString()}</div>`;
             txList.appendChild(div);
         });
     }
@@ -117,18 +108,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const followers = followerInput ? parseInt(followerInput.value) || 0 : 0;
         if (isNaN(amount) && amount !== undefined) return;
         chrome.storage.local.set({
-            fakeRobux: amount,
-            setFakeRobux: amount,
-            larpDisplayName: displayName,
-            larpUsername: username,
-            larpFollowers: followers
-        }, () => {
-            showStatus('committed', 'success');
-        });
+            fakeRobux: amount, setFakeRobux: amount,
+            larpDisplayName: displayName, larpUsername: username, larpFollowers: followers
+        }, () => showStatus('committed', 'success'));
     });
 
     addTxBtn.addEventListener('click', () => {
-        if (!txDesc || !txType || !txAmount || !txDate) return;
         const desc = txDesc.value.trim();
         const type = txType.value;
         const amount = parseInt(txAmount.value);
@@ -151,85 +136,56 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatus('fetching');
         addItemBtn.disabled = true;
         try {
-            let detailRes = await fetch(`https://economy.roblox.com/v2/assets/${assetId}/details`);
+            const detailRes = await fetch(`https://economy.roblox.com/v2/assets/${assetId}/details`);
             if (!detailRes.ok) {
                 const bundleRes = await fetch(`https://catalog.roblox.com/v1/bundles/${assetId}/details`);
-                if (bundleRes.ok) {
-                    showStatus('bundle');
-                    const bundleData = await bundleRes.json();
-                    if (bundleData.items && bundleData.items.length > 0) {
-                        const assets = bundleData.items.filter(item => item.type === "Asset");
-                        if (assets.length > 0) {
-                            const assetIdsStr = assets.map(a => a.id).join(',');
-                            const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/assets?assetIds=${assetIdsStr}&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false`);
-                            let thumbsMap = {};
-                            if (thumbRes.ok) {
-                                const thumbData = await thumbRes.json();
-                                (thumbData.data || []).forEach(t => { thumbsMap[t.targetId] = t.imageUrl; });
-                            }
-
-                            const assetTypePromises = assets.map(async (item) => {
-                                try {
-                                    const typeRes = await fetch(`https://economy.roblox.com/v2/assets/${item.id}/details`);
-                                    if (typeRes.ok) {
-                                        const typeData = await typeRes.json();
-                                        return { id: item.id, assetType: typeData.AssetTypeId };
-                                    }
-                                } catch (e) { }
-                                return { id: item.id, assetType: null };
-                            });
-                            const assetTypes = await Promise.all(assetTypePromises);
-                            const assetTypeMap = {};
-                            assetTypes.forEach(at => { assetTypeMap[at.id] = at.assetType; });
-
-                            chrome.storage.local.get(['inventory'], (result) => {
-                                const inventory = result.inventory || [];
-                                for (const item of assets) {
-                                    inventory.push({
-                                        name: item.name,
-                                        image: thumbsMap[item.id] || "",
-                                        creator: bundleData.creator?.name || "Roblox",
-                                        date: new Date().toISOString(),
-                                        id: Math.random().toString(36).substr(2, 9),
-                                        assetId: item.id.toString(),
-                                        limitedStatus: null,
-                                        assetType: assetTypeMap[item.id] || null
-                                    });
-                                }
-                                chrome.storage.local.set({ inventory }, () => {
-                                    addItemIdInput.value = '';
-                                    showStatus('bundle added', 'success');
-                                    addItemBtn.disabled = false;
-                                    renderInventoryPreview(inventory);
-                                });
-                            });
-                            return;
-                        }
-                    }
-                }
-                throw new Error('Invalid Asset or Bundle ID');
+                if (!bundleRes.ok) throw new Error('Invalid Asset or Bundle ID');
+                const bundleData = await bundleRes.json();
+                const assets = (bundleData.items || []).filter(i => i.type === 'Asset');
+                if (!assets.length) throw new Error('Empty bundle');
+                const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/assets?assetIds=${assets.map(a => a.id).join(',')}&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false`);
+                const thumbsMap = {};
+                if (thumbRes.ok) ((await thumbRes.json()).data || []).forEach(t => { thumbsMap[t.targetId] = t.imageUrl; });
+                const typeMap = {};
+                await Promise.all(assets.map(async (item) => {
+                    try {
+                        const r = await fetch(`https://economy.roblox.com/v2/assets/${item.id}/details`);
+                        if (r.ok) typeMap[item.id] = (await r.json()).AssetTypeId;
+                    } catch (e) { }
+                }));
+                chrome.storage.local.get(['inventory'], (result) => {
+                    const inventory = result.inventory || [];
+                    assets.forEach(item => inventory.push({
+                        name: item.name, image: thumbsMap[item.id] || '',
+                        creator: (bundleData.creator && bundleData.creator.name) || 'Roblox',
+                        date: new Date().toISOString(),
+                        id: Math.random().toString(36).substr(2, 9),
+                        assetId: item.id.toString(), limitedStatus: null,
+                        assetType: typeMap[item.id] || null
+                    }));
+                    chrome.storage.local.set({ inventory }, () => {
+                        addItemIdInput.value = '';
+                        showStatus('bundle added', 'success');
+                        addItemBtn.disabled = false;
+                        renderInventoryPreview(inventory);
+                    });
+                });
+                return;
             }
             const data = await detailRes.json();
             const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/assets?assetIds=${assetId}&returnPolicy=PlaceHolder&size=420x420&format=Png&isCircular=false`);
             let imageUrl = '';
-            if (thumbRes.ok) {
-                const thumbData = await thumbRes.json();
-                imageUrl = thumbData.data?.[0]?.imageUrl || '';
-            }
-            let limitedStatus = null;
-            if (data.IsLimitedUnique) limitedStatus = 'limited_u';
-            else if (data.IsLimited) limitedStatus = 'limited';
-
+            if (thumbRes.ok) imageUrl = ((await thumbRes.json()).data || [])[0]?.imageUrl || '';
             chrome.storage.local.get(['inventory'], (result) => {
                 const inventory = result.inventory || [];
                 inventory.push({
-                    name: data.Name || data.name || "Roblox Item",
+                    name: data.Name || data.name || 'Roblox Item',
                     image: imageUrl,
-                    creator: data.Creator?.Name || "Roblox",
+                    creator: (data.Creator && data.Creator.Name) || 'Roblox',
                     date: new Date().toISOString(),
                     id: Math.random().toString(36).substr(2, 9),
-                    assetId: assetId,
-                    limitedStatus: limitedStatus,
+                    assetId,
+                    limitedStatus: data.IsLimitedUnique ? 'limited_u' : (data.IsLimited ? 'limited' : null),
                     assetType: data.AssetTypeId
                 });
                 chrome.storage.local.set({ inventory }, () => {
@@ -241,32 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (e) {
             showStatus('failed', 'error');
-            console.error(e);
             addItemBtn.disabled = false;
-        }
-    });
-
-    resetBtn.addEventListener('click', () => {
-        if (confirm('Purge all simulated data?')) {
-            chrome.storage.local.remove(
-                ['fakeRobux', 'setFakeRobux', 'inventory', 'history', 'equipped', 'transactions',
-                 'larpDisplayName', 'larpUsername', 'larpFollowers', 'larpBio', 'larpTarget',
-                 'larpId', 'larpBodyColors'],
-                () => {
-                    robuxInput.value = 10000000;
-                    if (displayNameInput) displayNameInput.value = '';
-                    if (usernameInput) usernameInput.value = '';
-                    if (followerInput) followerInput.value = '';
-                    if (txList) txList.innerHTML = '';
-                    if (invGrid) invGrid.innerHTML = '';
-                    if (invCount) invCount.textContent = '0 items';
-                    target = null;
-                    if (tUser) tUser.value = '';
-                    if (tApply) tApply.disabled = true;
-                    renderTargetPreview();
-                    showStatus('purged', 'success');
-                }
-            );
         }
     });
 
@@ -280,7 +211,8 @@ document.addEventListener('DOMContentLoaded', () => {
         name: document.getElementById('opt-name'),
         bio: document.getElementById('opt-bio'),
         followers: document.getElementById('opt-followers'),
-        outfit: document.getElementById('opt-outfit')
+        outfit: document.getElementById('opt-outfit'),
+        badges: document.getElementById('opt-badges')
     };
     let target = null;
 
@@ -315,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="target-meta">
                     <div class="target-name">${esc(target.displayName)}</div>
                     <div class="target-handle">@${esc(target.name)}</div>
-                    <div class="target-stats">${(target.followers || 0).toLocaleString()} followers</div>
+                    <div class="target-stats">${(target.followers || 0).toLocaleString()} followers · ${(target.friends || []).length} friends</div>
                     ${target.description ? `<div class="target-bio">${esc(target.description)}</div>` : ''}
                 </div>
             </div>`;
@@ -327,36 +259,53 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const hit = await resolveUser(username);
             const id = hit.id;
-            const [profile, followers, followings, friends, avatar, thumb, headshot, bust] = await Promise.all([
+            const [profile, followers, followings, friends, avatar, thumb, headshot, bust,
+                   badges, socialLinks, premium, primaryGroup, usernameHistory, friendsList, presence] = await Promise.all([
                 jget(`https://users.roblox.com/v1/users/${id}`).catch(() => ({})),
                 jget(`https://friends.roblox.com/v1/users/${id}/followers/count`).catch(() => ({ count: 0 })),
                 jget(`https://friends.roblox.com/v1/users/${id}/followings/count`).catch(() => ({ count: 0 })),
                 jget(`https://friends.roblox.com/v1/users/${id}/friends/count`).catch(() => ({ count: 0 })),
                 jget(`https://avatar.roblox.com/v1/users/${id}/avatar`).catch(() => null),
-                jget(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${id}&size=420x420&format=Png&isCircular=false`)
-                    .then(j => j.data?.[0]?.imageUrl).catch(() => null),
-                jget(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${id}&size=150x150&format=Png&isCircular=false`)
-                    .then(j => j.data?.[0]?.imageUrl).catch(() => null),
-                jget(`https://thumbnails.roblox.com/v1/users/avatar-bust?userIds=${id}&size=420x420&format=Png&isCircular=false`)
-                    .then(j => j.data?.[0]?.imageUrl).catch(() => null)
+                jget(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${id}&size=420x420&format=Png&isCircular=false`).then(j => j.data?.[0]?.imageUrl).catch(() => null),
+                jget(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${id}&size=150x150&format=Png&isCircular=false`).then(j => j.data?.[0]?.imageUrl).catch(() => null),
+                jget(`https://thumbnails.roblox.com/v1/users/avatar-bust?userIds=${id}&size=420x420&format=Png&isCircular=false`).then(j => j.data?.[0]?.imageUrl).catch(() => null),
+                jget(`https://accountinformation.roblox.com/v1/users/${id}/roblox-badges`).catch(() => null),
+                jget(`https://accountinformation.roblox.com/v1/users/${id}/promotion-channels`).catch(() => null),
+                jget(`https://premiumfeatures.roblox.com/v1/users/${id}/validate-membership`).catch(() => null),
+                jget(`https://groups.roblox.com/v1/users/${id}/groups/primary/role`).catch(() => null),
+                jget(`https://users.roblox.com/v1/users/${id}/username-history`).catch(() => null),
+                jget(`https://friends.roblox.com/v1/users/${id}/friends?limit=50`).catch(() => ({})),
+                fetch('https://presence.roblox.com/v1/presence/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIds: [id] })
+                }).then(r => r.json()).catch(() => ({}))
             ]);
+
             target = {
                 id,
                 name: profile.name || hit.name,
                 displayName: profile.displayName || hit.displayName || hit.name,
                 description: profile.description || '',
+                created: profile.created || null,
+                hasVerifiedBadge: !!profile.hasVerifiedBadge,
+                premium: !!premium,
                 followers: followers.count ?? 0,
                 followings: followings.count ?? 0,
-                friends: friends.count ?? 0,
+                friendsCount: friends.count ?? 0,
                 avatar: avatar ? {
                     assets: avatar.assets || [],
                     bodyColors: avatar.bodyColors || null,
                     scales: avatar.scales || null,
                     playerAvatarType: avatar.playerAvatarType || 'R15'
                 } : null,
-                thumb,
-                headshot,
-                bust
+                thumb, headshot, bust,
+                badges,
+                socialLinks,
+                primaryGroup,
+                usernameHistory: usernameHistory ? usernameHistory.data : null,
+                friends: (friendsList && friendsList.data) || null,
+                presence: (presence.userPresences || [])[0] || null
             };
             renderTargetPreview();
             tApply.disabled = false;
@@ -384,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tOpts.followers.checked) {
             patch.larpFollowers = target.followers;
             patch.larpFollowing = target.followings;
-            patch.larpFriends = target.friends;
+            patch.larpFriends = target.friendsCount;
         }
         if (tOpts.bio.checked) patch.larpBio = target.description;
         if (tOpts.outfit.checked) {
@@ -417,5 +366,26 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             renderTargetPreview();
         }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        if (!confirm('Purge all simulated data?')) return;
+        chrome.storage.local.remove(
+            ['fakeRobux', 'setFakeRobux', 'inventory', 'history', 'equipped', 'transactions',
+             'larpDisplayName', 'larpUsername', 'larpFollowers', 'larpFollowing', 'larpFriends',
+             'larpBio', 'larpTarget', 'larpId', 'larpBodyColors'],
+            () => {
+                robuxInput.value = 10000000;
+                [displayNameInput, usernameInput, followerInput].forEach(el => { if (el) el.value = ''; });
+                if (txList) txList.innerHTML = '';
+                if (invGrid) invGrid.innerHTML = '';
+                if (invCount) invCount.textContent = '0 items';
+                target = null;
+                if (tUser) tUser.value = '';
+                if (tApply) tApply.disabled = true;
+                renderTargetPreview();
+                showStatus('purged', 'success');
+            }
+        );
     });
 });

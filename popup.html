@@ -12,15 +12,10 @@
 </head>
 <body>
     <div class="frost-pane">
-        <!-- Snow layers -->
         <div class="snow-layer" id="snow-back"></div>
         <div class="snow-layer" id="snow-mid"></div>
         <div class="snow-layer" id="snow-front"></div>
-
-        <!-- Frost overlay -->
         <div class="frost-overlay"></div>
-
-        <!-- Icicle accents -->
         <div class="icicle icicle-1"></div>
         <div class="icicle icicle-2"></div>
         <div class="icicle icicle-3"></div>
@@ -42,146 +37,78 @@
             </div>
             <div class="temp-badge">
                 <span class="temp-dot"></span>
-                <span class="temp-text">v1.2</span>
+                <span class="temp-text">v1.4</span>
             </div>
         </header>
 
         <nav class="frost-tabs">
-            <button class="frost-tab active" data-tab="core">
-                <span class="tab-frost"></span>
-                <span class="tab-label">core</span>
-            </button>
-            <button class="frost-tab" data-tab="target">
-                <span class="tab-frost"></span>
-                <span class="tab-label">target</span>
-            </button>
-            <button class="frost-tab" data-tab="items">
-                <span class="tab-frost"></span>
-                <span class="tab-label">items</span>
-            </button>
-            <button class="frost-tab" data-tab="ledger">
-                <span class="tab-frost"></span>
-                <span class="tab-label">ledger</span>
-            </button>
+            <button class="frost-tab active" data-tab="core"><span class="tab-frost"></span><span class="tab-label">core</span></button>
+            <button class="frost-tab" data-tab="target"><span class="tab-frost"></span><span class="tab-label">target</span></button>
+            <button class="frost-tab" data-tab="items"><span class="tab-frost"></span><span class="tab-label">items</span></button>
+            <button class="frost-tab" data-tab="ledger"><span class="tab-frost"></span><span class="tab-label">ledger</span></button>
         </nav>
 
         <main class="frost-body">
-            <!-- CORE TAB -->
             <div class="frost-panel active" id="panel-core">
                 <div class="frost-field">
-                    <label class="frost-label">
-                        <span class="label-mark">◈</span>
-                        Robux Balance
-                    </label>
+                    <label class="frost-label"><span class="label-mark">◈</span> Robux Balance</label>
                     <div class="frost-input-wrap">
                         <span class="input-ornament">R$</span>
                         <input type="number" id="robux-amount" value="10000000">
                     </div>
                 </div>
-
-                <div class="frost-divider">
-                    <span class="divider-ice"></span>
-                </div>
-
+                <div class="frost-divider"><span class="divider-ice"></span></div>
                 <div class="frost-field">
-                    <label class="frost-label">
-                        <span class="label-mark">◎</span>
-                        Display Name
-                    </label>
-                    <div class="frost-input-wrap">
-                        <input type="text" id="display-name" placeholder="who they see">
-                    </div>
+                    <label class="frost-label"><span class="label-mark">◎</span> Display Name</label>
+                    <div class="frost-input-wrap"><input type="text" id="display-name" placeholder="who they see"></div>
                 </div>
-
-                <div class="frost-divider">
-                    <span class="divider-ice"></span>
-                </div>
-
+                <div class="frost-divider"><span class="divider-ice"></span></div>
                 <div class="frost-field">
-                    <label class="frost-label">
-                        <span class="label-mark">@</span>
-                        Username
-                    </label>
-                    <div class="frost-input-wrap">
-                        <input type="text" id="username" placeholder="@handle">
-                    </div>
+                    <label class="frost-label"><span class="label-mark">@</span> Username</label>
+                    <div class="frost-input-wrap"><input type="text" id="username" placeholder="@handle"></div>
                 </div>
-
-                <div class="frost-divider">
-                    <span class="divider-ice"></span>
-                </div>
-
+                <div class="frost-divider"><span class="divider-ice"></span></div>
                 <div class="frost-field">
-                    <label class="frost-label">
-                        <span class="label-mark">◉</span>
-                        Followers
-                    </label>
-                    <div class="frost-input-wrap">
-                        <input type="number" id="follower-count" placeholder="0">
-                    </div>
+                    <label class="frost-label"><span class="label-mark">◉</span> Followers</label>
+                    <div class="frost-input-wrap"><input type="number" id="follower-count" placeholder="0"></div>
                 </div>
-
                 <div class="frost-actions">
-                    <button id="save-btn" class="frost-btn primary">
-                        <span class="btn-shimmer"></span>
-                        <span class="btn-text">Commit</span>
-                    </button>
-                    <button id="reset-btn" class="frost-btn ghost">
-                        <span class="btn-text">Purge</span>
-                    </button>
+                    <button id="save-btn" class="frost-btn primary"><span class="btn-shimmer"></span><span class="btn-text">Commit</span></button>
+                    <button id="reset-btn" class="frost-btn ghost"><span class="btn-text">Purge</span></button>
                 </div>
             </div>
 
-            <!-- TARGET TAB -->
             <div class="frost-panel" id="panel-target">
                 <div class="frost-field">
-                    <label class="frost-label">
-                        <span class="label-mark">◈</span>
-                        Larp As
-                    </label>
+                    <label class="frost-label"><span class="label-mark">◈</span> Larp As</label>
                     <div class="frost-input-wrap dual">
                         <input type="text" id="target-username" placeholder="username">
                         <button id="target-load-btn" class="frost-btn slim">Load</button>
                     </div>
                 </div>
-
                 <div id="target-preview" class="target-preview"></div>
-
                 <div class="target-opts">
                     <label><input type="checkbox" id="opt-name" checked> name + handle</label>
                     <label><input type="checkbox" id="opt-bio" checked> bio</label>
                     <label><input type="checkbox" id="opt-followers" checked> followers</label>
                     <label><input type="checkbox" id="opt-outfit" checked> outfit + body</label>
+                    <label><input type="checkbox" id="opt-badges" checked> badges + verified</label>
                 </div>
-
                 <div class="frost-actions">
-                    <button id="target-apply-btn" class="frost-btn primary" disabled>
-                        <span class="btn-shimmer"></span>
-                        <span class="btn-text">Apply</span>
-                    </button>
-                    <button id="target-clear-btn" class="frost-btn ghost">
-                        <span class="btn-text">Clear</span>
-                    </button>
+                    <button id="target-apply-btn" class="frost-btn primary" disabled><span class="btn-shimmer"></span><span class="btn-text">Apply</span></button>
+                    <button id="target-clear-btn" class="frost-btn ghost"><span class="btn-text">Clear</span></button>
                 </div>
             </div>
 
-            <!-- ITEMS TAB -->
             <div class="frost-panel" id="panel-items">
                 <div class="frost-field">
-                    <label class="frost-label">
-                        <span class="label-mark">+</span>
-                        Inject Asset
-                    </label>
+                    <label class="frost-label"><span class="label-mark">+</span> Inject Asset</label>
                     <div class="frost-input-wrap dual">
                         <input type="number" id="manual-item-id" placeholder="Asset ID">
                         <button id="add-item-btn" class="frost-btn slim">Add</button>
                     </div>
                 </div>
-
-                <div class="frost-divider">
-                    <span class="divider-ice"></span>
-                </div>
-
+                <div class="frost-divider"><span class="divider-ice"></span></div>
                 <div class="inventory-vault">
                     <div class="vault-header">
                         <span class="vault-title">Simulated Inventory</span>
@@ -191,13 +118,9 @@
                 </div>
             </div>
 
-            <!-- LEDGER TAB -->
             <div class="frost-panel" id="panel-ledger">
                 <div class="frost-field">
-                    <label class="frost-label">
-                        <span class="label-mark">$</span>
-                        New Entry
-                    </label>
+                    <label class="frost-label"><span class="label-mark">$</span> New Entry</label>
                     <div class="ledger-form">
                         <input type="text" id="tx-desc" placeholder="Description">
                         <input type="text" id="tx-type" placeholder="Type" value="Purchase">
@@ -208,15 +131,9 @@
                         <button id="add-tx-btn" class="frost-btn slim wide">Record</button>
                     </div>
                 </div>
-
-                <div class="frost-divider">
-                    <span class="divider-ice"></span>
-                </div>
-
+                <div class="frost-divider"><span class="divider-ice"></span></div>
                 <div class="ledger-scroll">
-                    <div class="ledger-header">
-                        <span>Transaction Log</span>
-                    </div>
+                    <div class="ledger-header"><span>Transaction Log</span></div>
                     <div class="ledger-entries" id="transaction-list"></div>
                 </div>
             </div>
@@ -227,9 +144,7 @@
                 <span class="status-crystal" id="status-bulb"></span>
                 <span class="status-word" id="status">ready</span>
             </div>
-            <div class="footer-right">
-                <span class="frost-clock" id="clock">--:--:--</span>
-            </div>
+            <div class="footer-right"><span class="frost-clock" id="clock">--:--:--</span></div>
         </footer>
     </div>
     <script src="popup.js"></script>
