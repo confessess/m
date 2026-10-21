@@ -6,6 +6,14 @@ var state = {
     transactions: [],
     equipped: [],
     larpId: null,
+    larpTarget: null,
+    larpBio: null,
+    larpDisplayName: '',
+    larpUsername: '',
+    larpFollowers: 0,
+    larpFollowing: 0,
+    larpFriends: 0,
+    realUserId: null,
     uiMode: 'auto'
 };
 

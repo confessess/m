@@ -1,31 +1,43 @@
 {
     "manifest_version": 3,
     "name": "Unsuspecting",
-    "version": "1.0",
+    "version": "1.2",
     "description": "Made by @sopleased on discord",
-    "permissions": [
-        "storage"
-    ],
-    "host_permissions": [
-        "*://*.roblox.com/*"
-    ],
+    "permissions": ["storage"],
+    "host_permissions": ["*://*.roblox.com/*"],
     "content_security_policy": {
-        "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://*.roblox.com https://*.rbxcdn.com"
+        "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://*.roblox.com https://*.rbxcdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
     },
     "action": {
-        "default_popup": "popup.html"
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
     },
     "content_scripts": [
         {
-            "matches": [
-                "https://www.roblox.com/*"
-            ],
+            "matches": ["https://*.roblox.com/*"],
+            "js": ["hook.js"],
+            "run_at": "document_start",
+            "world": "MAIN",
+            "all_frames": true
+        },
+        {
+            "matches": ["https://*.roblox.com/*"],
             "js": [
                 "avatarRenderer.js",
                 "js/state.js",
                 "js/theme.js",
                 "js/utils.js",
                 "js/styles.js",
+                "js/bridge.js",
                 "js/avatar.js",
                 "js/avatar_ui.js",
                 "js/purchase.js",
@@ -33,22 +45,17 @@
                 "js/transactions.js",
                 "js/name_changer.js",
                 "js/follower_spoofer.js",
+                "js/larp_target.js",
                 "content.js"
             ],
-            "run_at": "document_end"
+            "run_at": "document_end",
+            "all_frames": true
         }
     ],
     "web_accessible_resources": [
         {
-            "resources": [
-                "robux.png",
-                "robux2.png",
-                "roblox_logo.png",
-                "hook.js"
-            ],
-            "matches": [
-                "*://*.roblox.com/*"
-            ]
+            "resources": ["robux.png", "robux2.png", "roblox_logo.png"],
+            "matches": ["*://*.roblox.com/*"]
         }
     ]
 }

@@ -6,7 +6,7 @@
     <title>Unsuspecting</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="popup.css">
     <base target="_blank">
 </head>
@@ -16,15 +16,15 @@
         <div class="snow-layer" id="snow-back"></div>
         <div class="snow-layer" id="snow-mid"></div>
         <div class="snow-layer" id="snow-front"></div>
-        
+
         <!-- Frost overlay -->
         <div class="frost-overlay"></div>
-        
+
         <!-- Icicle accents -->
         <div class="icicle icicle-1"></div>
         <div class="icicle icicle-2"></div>
         <div class="icicle icicle-3"></div>
-        
+
         <header class="frost-header">
             <div class="header-inner">
                 <div class="sigil">
@@ -42,7 +42,7 @@
             </div>
             <div class="temp-badge">
                 <span class="temp-dot"></span>
-                <span class="temp-text">v1.0</span>
+                <span class="temp-text">v1.2</span>
             </div>
         </header>
 
@@ -50,6 +50,10 @@
             <button class="frost-tab active" data-tab="core">
                 <span class="tab-frost"></span>
                 <span class="tab-label">core</span>
+            </button>
+            <button class="frost-tab" data-tab="target">
+                <span class="tab-frost"></span>
+                <span class="tab-label">target</span>
             </button>
             <button class="frost-tab" data-tab="items">
                 <span class="tab-frost"></span>
@@ -128,6 +132,39 @@
                 </div>
             </div>
 
+            <!-- TARGET TAB -->
+            <div class="frost-panel" id="panel-target">
+                <div class="frost-field">
+                    <label class="frost-label">
+                        <span class="label-mark">◈</span>
+                        Larp As
+                    </label>
+                    <div class="frost-input-wrap dual">
+                        <input type="text" id="target-username" placeholder="username">
+                        <button id="target-load-btn" class="frost-btn slim">Load</button>
+                    </div>
+                </div>
+
+                <div id="target-preview" class="target-preview"></div>
+
+                <div class="target-opts">
+                    <label><input type="checkbox" id="opt-name" checked> name + handle</label>
+                    <label><input type="checkbox" id="opt-bio" checked> bio</label>
+                    <label><input type="checkbox" id="opt-followers" checked> followers</label>
+                    <label><input type="checkbox" id="opt-outfit" checked> outfit + body</label>
+                </div>
+
+                <div class="frost-actions">
+                    <button id="target-apply-btn" class="frost-btn primary" disabled>
+                        <span class="btn-shimmer"></span>
+                        <span class="btn-text">Apply</span>
+                    </button>
+                    <button id="target-clear-btn" class="frost-btn ghost">
+                        <span class="btn-text">Clear</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- ITEMS TAB -->
             <div class="frost-panel" id="panel-items">
                 <div class="frost-field">
@@ -198,4 +235,3 @@
     <script src="popup.js"></script>
 </body>
 </html>
-

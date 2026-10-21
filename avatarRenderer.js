@@ -16,14 +16,9 @@ const POLL_MAX_TRIES = 30;
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
-// Only one render runs at a time — any new call cancels the previous one.
 let activeAbortController = null;
 
-// Cache the base avatar per userId so we don't re-fetch it on every click.
 const avatarBaseCache = new Map();
-
-// Cache completed renders by a key of sorted assetIds so repeated clicks
-// on the same item set return instantly.
 const renderCache = new Map();
 
 const sleep = (ms, signal) =>
@@ -64,7 +59,6 @@ async function fetchAvatarBase(userId) {
     return data;
 }
 
-/** Clear the cached base avatar (call if the user changes their real outfit mid-session) */
 function clearAvatarBaseCache(userId) {
     if (userId) avatarBaseCache.delete(userId);
     else avatarBaseCache.clear();
@@ -79,12 +73,7 @@ async function getLoggedInUserId() {
 }
 
 // ─── BrickColor → hex ────────────────────────────────────────────────────────
-// The avatar API returns body colors as numeric BrickColor IDs.
-// The render endpoint requires hex strings. This table covers all skin tones
-// and common body colors. Falls back to the value as-is if it's already a
-// hex string (some API responses do return hex directly).
 
-// Full accurate BrickColor ID → hex table sourced from the Roblox developer forum.
 const BRICK_COLOR_HEX = {
     1: '#f2f3f3', 2: '#a1a5a2', 3: '#f9e999', 5: '#d7c59a',
     6: '#c2dab8', 9: '#e8bac8', 11: '#80bbe3', 12: '#cb8442',
@@ -140,17 +129,13 @@ const BRICK_COLOR_HEX = {
     1029: '#ffffcc', 1030: '#ffcc99', 1031: '#6225d1', 1032: '#ff00bf',
 };
 
-/**
- * Convert a body color value to a hex string.
- * Handles: numeric BrickColor ID, hex string, or rgb(...) string.
- */
 function toHex(value) {
-    if (!value && value !== 0) return '#f5cda3'; // safe skin-tone fallback
-    if (typeof value === 'string' && value.startsWith('#')) return value; // already hex
+    if (!value && value !== 0) return '#f5cda3';
+    if (typeof value === 'string' && value.startsWith('#')) return value;
     if (typeof value === 'number' || /^\d+$/.test(String(value))) {
         return BRICK_COLOR_HEX[Number(value)] ?? '#f5cda3';
     }
-    return String(value); // pass through anything else as-is
+    return String(value);
 }
 
 function convertBodyColors(bodyColors) {
@@ -198,11 +183,13 @@ function buildAvatarDefinition(base, larpIds, { replaceWornItems = false } = {})
     };
 }
 
-function makeCacheKey(assetIds, replaceWornItems, bodyColors) {
+// CHANGED: userId is now part of the key so two different users with the
+// same (empty) asset list don't collide.
+function makeCacheKey(userId, assetIds, replaceWornItems, bodyColors) {
     const colorStr = bodyColors
         ? Object.values(bodyColors).join(',')
         : '';
-    return [...assetIds].sort().join(',') + '|' + colorStr + (replaceWornItems ? ':replace' : '');
+    return userId + '|' + [...assetIds].sort().join(',') + '|' + colorStr + (replaceWornItems ? ':replace' : '');
 }
 
 async function postRenderAndPoll(avatarDefinition, size, signal) {
@@ -211,7 +198,7 @@ async function postRenderAndPoll(avatarDefinition, size, signal) {
     const bodyJson = JSON.stringify({
         thumbnailConfig: { thumbnailId: 1, size, thumbnailType: '2d' },
         avatarDefinition,
-        _cacheBust: Date.now(), // forces Roblox to treat this as a new render request
+        _cacheBust: Date.now(),
     });
 
     const doPost = (token) => fetch(RENDER_ENDPOINT, {
@@ -224,7 +211,6 @@ async function postRenderAndPoll(avatarDefinition, size, signal) {
 
     let res = await doPost(csrf);
 
-    // CSRF token may have rotated — Roblox sends the new one back in the 403 header
     if (res.status === 403) {
         csrf = res.headers.get('x-csrf-token') ?? csrf;
         res = await doPost(csrf);
@@ -239,7 +225,6 @@ async function postRenderAndPoll(avatarDefinition, size, signal) {
     if (initial.state === 'Completed' && initial.imageUrl) return initial.imageUrl;
     if (initial.state === 'Error') throw new Error('Roblox render failed immediately');
 
-    // Poll by re-POSTing — Roblox deduplicates by request hash, GET is not supported
     for (let i = 0; i < POLL_MAX_TRIES; i++) {
         await sleep(POLL_INTERVAL_MS, signal);
 
@@ -249,7 +234,6 @@ async function postRenderAndPoll(avatarDefinition, size, signal) {
         const data = await pollRes.json();
         if (data.state === 'Completed' && data.imageUrl) return data.imageUrl;
         if (data.state === 'Error') throw new Error('Roblox render failed server-side');
-        // state === 'Pending' → keep waiting
     }
 
     throw new Error('Render timed out — Roblox servers may be slow, try again');
@@ -257,20 +241,14 @@ async function postRenderAndPoll(avatarDefinition, size, signal) {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/**
- * Render a 2D avatar with larp items equipped.
- * Automatically cancels any in-flight render when called again,
- * so rapid clicks never cause race conditions or stale redraws.
- */
 async function renderAvatarWithItems({
     userId,
     assetIds,
     size = '420x420',
     replaceWornItems = false,
-    bodyColors = null,        // optional override — pass when user picks a new body color
+    bodyColors = null,
     onStateChange = null,
 }) {
-    console.trace('[LarpBlox] renderAvatarWithItems called');
     if (activeAbortController) activeAbortController.abort();
     const controller = new AbortController();
     activeAbortController = controller;
@@ -281,7 +259,7 @@ async function renderAvatarWithItems({
     };
 
     try {
-        const cacheKey = makeCacheKey(assetIds, replaceWornItems, bodyColors);
+        const cacheKey = makeCacheKey(userId, assetIds, replaceWornItems, bodyColors);
         if (renderCache.has(cacheKey)) {
             const cached = renderCache.get(cacheKey);
             notify('done', cached);
@@ -290,7 +268,6 @@ async function renderAvatarWithItems({
 
         notify('loading', 'Fetching avatar data…');
 
-        // Bust the base cache when colors are changing so stale colors aren't reused
         if (bodyColors) {
             if (typeof clearAvatarBaseCache === 'function') clearAvatarBaseCache(userId);
             else avatarBaseCache.delete(userId);
@@ -300,7 +277,6 @@ async function renderAvatarWithItems({
 
         if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
-        // Convert the override colors the same way as the base — in case they're BrickColor IDs
         const convertedOverride = bodyColors ? {
             headColor: toHex(bodyColors.headColor ?? bodyColors.headColorId),
             torsoColor: toHex(bodyColors.torsoColor ?? bodyColors.torsoColorId),
@@ -315,11 +291,6 @@ async function renderAvatarWithItems({
             : base;
 
         const definition = buildAvatarDefinition(mergedBase, assetIds, { replaceWornItems });
-
-        console.log('[LarpBlox] bodyColors coming in:', JSON.stringify(bodyColors));
-        console.log('[LarpBlox] base.bodyColors from API:', JSON.stringify(base.bodyColors));
-        console.log('[LarpBlox] convertedOverride:', JSON.stringify(convertedOverride));
-        console.log('[LarpBlox] final definition bodyColors:', JSON.stringify(definition.bodyColors));
 
         notify('polling', 'Rendering…');
         const imageUrl = await postRenderAndPoll(definition, size, signal);
@@ -337,7 +308,6 @@ async function renderAvatarWithItems({
     }
 }
 
-/** Clear the render cache (e.g. after the user changes their real outfit) */
 function clearRenderCache() {
     renderCache.clear();
 }

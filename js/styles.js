@@ -1,5 +1,9 @@
 // LarpBlox - Global Styles and CSS Injection
 
+function larpHead() {
+    return document.head || document.documentElement;
+}
+
 function applyGlobalStyles() {
     if (document.getElementById('larp-global-styles')) return;
 
@@ -27,7 +31,7 @@ function applyGlobalStyles() {
         }
     `;
 
-    (document.head || document.documentElement).appendChild(style);
+    larpHead().appendChild(style);
 }
 
 // Add Global Style Fixes for Larp items
@@ -185,4 +189,4 @@ larpStyle.textContent = `
     }
 `;
 
-document.head.appendChild(larpStyle);
+larpHead().appendChild(larpStyle);

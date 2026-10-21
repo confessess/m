@@ -27,16 +27,13 @@ async function handleAvatarLarping() {
     const isAvatarPage = window.location.href.includes('/my/avatar');
     const isProfilePage = window.location.href.includes('/users/') && window.location.href.includes('/profile');
 
-    // Check if it's OUR profile
     let isMyProfile = false;
     if (isProfilePage) {
         const metaTag = document.querySelector('meta[name="user-data"]');
         if (metaTag) {
             const myUserId = metaTag.getAttribute('data-userid');
             const match = window.location.href.match(/\/users\/(\d+)/);
-            if (match && myUserId && match[1] === myUserId) {
-                isMyProfile = true;
-            }
+            if (match && myUserId && match[1] === myUserId) isMyProfile = true;
         }
         if (!isMyProfile && document.body) {
             const btns = Array.from(document.querySelectorAll('a, button, span'));
@@ -46,7 +43,6 @@ async function handleAvatarLarping() {
         }
     }
 
-    // Grab Global Nav Icons (Sidebar & Top Right)
     const navImgs = Array.from(document.querySelectorAll('img')).filter(img => {
         if (!img.src) return false;
         if (!img.src.includes('rbxcdn.com') && !img.src.startsWith('blob:') && !img.src.startsWith('data:')) return false;
@@ -59,7 +55,6 @@ async function handleAvatarLarping() {
             const isAvatarClass = img.className.includes('avatar') || (img.parentElement && img.parentElement.className.includes('avatar'));
             const isAvatarSrc = img.src.toLowerCase().includes('avatar') || img.src.toLowerCase().includes('headshot');
             const isProfileLink = img.closest('a') && (img.closest('a').href.includes('/profile') || img.closest('a').href.includes('/users/'));
-
             return isAvatarClass || isAvatarSrc || isProfileLink;
         }
         return false;
@@ -114,7 +109,12 @@ async function handleAvatarLarping() {
         }
     });
 
-    const equippedLarpItems = state.inventory.filter(item => (state.equipped || []).includes(item.id));
+    // CHANGED: when larping a target, the target's body IS the base — so pass no
+    // extra asset ids and let the render be an exact clone.
+    const isTargetLarp = !!state.larpTarget;
+    const equippedLarpItems = isTargetLarp
+        ? []
+        : state.inventory.filter(item => (state.equipped || []).includes(item.id));
     const isLarping = !!state.larpId || equippedLarpItems.length > 0;
 
     if (!isLarping) {
@@ -136,7 +136,6 @@ async function handleAvatarLarping() {
         const comboKey = (state.larpId || 'self') + ':' + equippedAssetIds.sort().join(',') + '|' + colorHash;
 
         if (window._larpComboKey !== comboKey) {
-            console.log('[LarpBlox] ComboKey mismatch, starting render. Target imgs count:', targetImgs.length);
             if (window._larpRenderCache && window._larpRenderCacheCombo === comboKey) {
                 window._larpComboKey = comboKey;
                 applyRenderToImgs(window._larpRenderCache, targetImgs);
@@ -159,11 +158,7 @@ async function handleAvatarLarping() {
                             targetUserId = data.id;
                         } catch (e) { }
                     }
-
-                    if (!targetUserId) {
-                        window._larpComboKey = null;
-                        return;
-                    }
+                    if (!targetUserId) { window._larpComboKey = null; return; }
 
                     const currentColors = window._larpCustomBodyColors || null;
                     const newUrl = await renderAvatarWithItems({
@@ -189,8 +184,9 @@ async function handleAvatarLarping() {
         }
     }
 
-    // Handle "Currently Wearing" list injection
-    if (isAvatarPage || isMyProfile) {
+    // CHANGED: when larping a target the hook replaces the avatar API payload, so
+    // Roblox's own React renders "Currently Wearing" — skip manual injection.
+    if ((isAvatarPage || isMyProfile) && !isTargetLarp) {
         let wearingList = null;
         const headings = Array.from(document.querySelectorAll('h2, h3, div')).filter(el => el.textContent.trim() === 'Currently Wearing');
         if (headings.length > 0) {
@@ -199,24 +195,12 @@ async function handleAvatarLarping() {
                 const realItem = container.querySelector('li.list-item, li.item-card, li.avatar-status-item, [id="collection-carousel-item"], .profile-item-card');
                 if (realItem) {
                     const carouselItem = realItem.closest('[id="collection-carousel-item"]') || realItem.closest('.css-izzd58-carouselItem');
-                    if (carouselItem && carouselItem.parentElement) {
-                        wearingList = carouselItem.parentElement;
-                        break;
-                    }
-                    if (realItem.parentElement && realItem.parentElement.tagName === 'UL') {
-                        wearingList = realItem.parentElement;
-                        break;
-                    }
-                    if (realItem.classList.contains('item-card')) {
-                        wearingList = realItem.parentElement;
-                        break;
-                    }
+                    if (carouselItem && carouselItem.parentElement) { wearingList = carouselItem.parentElement; break; }
+                    if (realItem.parentElement && realItem.parentElement.tagName === 'UL') { wearingList = realItem.parentElement; break; }
+                    if (realItem.classList.contains('item-card')) { wearingList = realItem.parentElement; break; }
                 }
                 const ul = container.querySelector('ul.hlist, ul.slide-item-container-inner, ul');
-                if (ul) {
-                    wearingList = ul;
-                    break;
-                }
+                if (ul) { wearingList = ul; break; }
                 container = container.parentElement;
             }
         }
@@ -238,7 +222,7 @@ async function handleAvatarLarping() {
                 if (isEquipped && !alreadyInList) {
                     const wrapper = document.createElement(isProfilePage ? 'div' : 'li');
                     wrapper.dataset.simWearing = item.id;
-                    wrapper.dataset.simId = item.id; // Added for CSS targeting
+                    wrapper.dataset.simId = item.id;
 
                     if (isProfilePage) {
                         wrapper.id = "collection-carousel-item";
