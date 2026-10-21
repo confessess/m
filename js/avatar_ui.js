@@ -63,8 +63,9 @@ function getActiveCategory() {
 }
 
 function getItemCategory(item) {
-    if (!item.assetType) return 'recent';
-    return ASSET_TYPE_CATEGORIES[item.assetType] || 'recent';
+    if (!item.assetType && item.assetType !== 0) return 'recent';
+    const type = Number(item.assetType);
+    return ASSET_TYPE_CATEGORIES[type] || 'recent';
 }
 
 function handleInventoryInjection() {

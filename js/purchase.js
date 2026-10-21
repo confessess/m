@@ -158,13 +158,25 @@ function showSimulatedPurchase(name, price, image, limitedStatus, creator = "Rob
             const assetId = getAssetIdFromUrl();
             const isBundle = window.location.href.includes('/bundles/');
 
+            let assetType = null;
+            if (!isBundle && assetId) {
+                try {
+                    const typeRes = await fetch(`https://economy.roblox.com/v2/assets/${assetId}/details`);
+                    if (typeRes.ok) {
+                        const typeData = await typeRes.json();
+                        assetType = typeData.AssetTypeId;
+                    }
+                } catch (e) {}
+            }
+
             state.inventory.push({
                 name, image, creator,
                 date: new Date().toISOString(),
                 id: Math.random().toString(36).substr(2, 9),
                 assetId: assetId,
                 limitedStatus: limitedStatus || null,
-                price: price
+                price: price,
+                assetType: assetType
             });
             state.history.push({ name, price, image, creator, date: new Date().toISOString() });
 
@@ -185,6 +197,20 @@ function showSimulatedPurchase(name, price, image, limitedStatus, creator = "Rob
                                 }
                             } catch (e) { }
 
+                            const assetTypePromises = bundleAssets.map(async (item) => {
+                                try {
+                                    const typeRes = await fetch(`https://economy.roblox.com/v2/assets/${item.id}/details`);
+                                    if (typeRes.ok) {
+                                        const typeData = await typeRes.json();
+                                        return { id: item.id, assetType: typeData.AssetTypeId };
+                                    }
+                                } catch (e) {}
+                                return { id: item.id, assetType: null };
+                            });
+                            const assetTypes = await Promise.all(assetTypePromises);
+                            const assetTypeMap = {};
+                            assetTypes.forEach(at => { assetTypeMap[at.id] = at.assetType; });
+
                             for (const item of bundleAssets) {
                                 state.inventory.push({
                                     name: item.name,
@@ -195,7 +221,8 @@ function showSimulatedPurchase(name, price, image, limitedStatus, creator = "Rob
                                     assetId: item.id.toString(),
                                     limitedStatus: null,
                                     price: 0,
-                                    isBundlePart: true
+                                    isBundlePart: true,
+                                    assetType: assetTypeMap[item.id] || null
                                 });
                             }
                         }

@@ -6,158 +6,196 @@
     <title>Unsuspecting</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="popup.css">
-<base target="_blank">
+    <base target="_blank">
 </head>
 <body>
-    <div class="container">
-        <div class="glow glow-1"></div>
-        <div class="glow glow-2"></div>
-
-        <div class="snowflake sf-1">&#10052;</div>
-        <div class="snowflake sf-2">&#10053;</div>
-        <div class="snowflake sf-3">&#10052;</div>
-        <div class="snowflake sf-4">&#10053;</div>
-        <div class="snowflake sf-5">&#10052;</div>
-
-        <header>
-            <div class="logo-row">
-                <div class="logo-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#grad1)" opacity="0.9" />
-                        <path d="M2 17L12 22L22 17" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-                        <path d="M2 12L12 17L22 12" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-                        <defs>
-                            <linearGradient id="grad1" x1="2" y1="2" x2="22" y2="22">
-                                <stop offset="0%" stop-color="#a78bfa" />
-                                <stop offset="100%" stop-color="#6366f1" />
-                            </linearGradient>
-                        </defs>
+    <div class="frost-pane">
+        <!-- Snow layers -->
+        <div class="snow-layer" id="snow-back"></div>
+        <div class="snow-layer" id="snow-mid"></div>
+        <div class="snow-layer" id="snow-front"></div>
+        
+        <!-- Frost overlay -->
+        <div class="frost-overlay"></div>
+        
+        <!-- Icicle accents -->
+        <div class="icicle icicle-1"></div>
+        <div class="icicle icicle-2"></div>
+        <div class="icicle icicle-3"></div>
+        
+        <header class="frost-header">
+            <div class="header-inner">
+                <div class="sigil">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <path d="M14 2L4 8L14 14L24 8L14 2Z" stroke="#a8c4e0" stroke-width="1.2" fill="none" opacity="0.6"/>
+                        <path d="M4 14L14 20L24 14" stroke="#a8c4e0" stroke-width="1.2" fill="none" opacity="0.4"/>
+                        <path d="M4 20L14 26L24 20" stroke="#a8c4e0" stroke-width="1.2" fill="none" opacity="0.2"/>
+                        <circle cx="14" cy="14" r="3" fill="#c5d8ed" opacity="0.3"/>
                     </svg>
                 </div>
-                <div class="logo-text">
+                <div class="header-text">
                     <h1>Unsuspecting</h1>
-                    <p>Frost injection toolkit</p>
+                    <p class="subtitle">frost injection toolkit</p>
                 </div>
             </div>
-            <div class="version-badge">v1.0</div>
+            <div class="temp-badge">
+                <span class="temp-dot"></span>
+                <span class="temp-text">v1.0</span>
+            </div>
         </header>
 
-        <div id="main-content">
-            <div class="card">
-                <div class="input-group">
-                    <label for="robux-amount">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8" />
-                            <path d="M12 18V6" />
-                        </svg>
+        <nav class="frost-tabs">
+            <button class="frost-tab active" data-tab="core">
+                <span class="tab-frost"></span>
+                <span class="tab-label">core</span>
+            </button>
+            <button class="frost-tab" data-tab="items">
+                <span class="tab-frost"></span>
+                <span class="tab-label">items</span>
+            </button>
+            <button class="frost-tab" data-tab="ledger">
+                <span class="tab-frost"></span>
+                <span class="tab-label">ledger</span>
+            </button>
+        </nav>
+
+        <main class="frost-body">
+            <!-- CORE TAB -->
+            <div class="frost-panel active" id="panel-core">
+                <div class="frost-field">
+                    <label class="frost-label">
+                        <span class="label-mark">◈</span>
                         Robux Balance
                     </label>
-                    <div class="input-wrapper">
-                        <span class="robux-icon">R$</span>
+                    <div class="frost-input-wrap">
+                        <span class="input-ornament">R$</span>
                         <input type="number" id="robux-amount" value="10000000">
                     </div>
                 </div>
 
-                <div class="divider"></div>
+                <div class="frost-divider">
+                    <span class="divider-ice"></span>
+                </div>
 
-                <div class="input-group">
-                    <label for="display-name">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                            <circle cx="12" cy="7" r="4"/>
-                        </svg>
+                <div class="frost-field">
+                    <label class="frost-label">
+                        <span class="label-mark">◎</span>
                         Display Name
                     </label>
-                    <div class="input-wrapper">
-                        <input type="text" id="display-name" placeholder="Display Name" style="padding-left: 14px;">
+                    <div class="frost-input-wrap">
+                        <input type="text" id="display-name" placeholder="who they see">
                     </div>
                 </div>
 
-                <div class="divider"></div>
+                <div class="frost-divider">
+                    <span class="divider-ice"></span>
+                </div>
 
-                <div class="input-group">
-                    <label for="username">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                            <circle cx="8.5" cy="7" r="4"/>
-                            <path d="M20 8v6M23 11h-6"/>
-                        </svg>
+                <div class="frost-field">
+                    <label class="frost-label">
+                        <span class="label-mark">@</span>
                         Username
                     </label>
-                    <div class="input-wrapper">
-                        <span class="robux-icon" style="position: static; margin-left: 14px; margin-right: 4px;">@</span>
-                        <input type="text" id="username" placeholder="username" style="padding-left: 8px;">
+                    <div class="frost-input-wrap">
+                        <input type="text" id="username" placeholder="@handle">
                     </div>
                 </div>
 
-                <div class="divider"></div>
+                <div class="frost-divider">
+                    <span class="divider-ice"></span>
+                </div>
 
-                <div class="input-group">
-                    <label for="follower-count">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 00-3-3.87"/>
-                            <path d="M16 3.13a4 4 0 010 7.75"/>
-                        </svg>
+                <div class="frost-field">
+                    <label class="frost-label">
+                        <span class="label-mark">◉</span>
                         Followers
                     </label>
-                    <div class="input-wrapper">
-                        <input type="number" id="follower-count" placeholder="1000" style="padding-left: 14px;">
+                    <div class="frost-input-wrap">
+                        <input type="number" id="follower-count" placeholder="0">
                     </div>
                 </div>
 
-                <div class="divider"></div>
-
-                <div class="input-group">
-                    <label for="manual-item-id">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        Add Larp Item
-                    </label>
-                    <div class="input-wrapper" style="display: flex; gap: 8px;">
-                        <div style="flex: 1; position: relative; background: rgba(0, 0, 0, 0.35); border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; align-items: center;">
-                            <span class="robux-icon" style="position: static; margin-left: 14px; margin-right: 4px;">#</span>
-                            <input type="number" id="manual-item-id" placeholder="Asset ID" style="background: transparent; border: none; padding-left: 8px; box-shadow: none;">
-                        </div>
-                        <button id="add-item-btn" class="primary-btn" style="padding: 0 16px; margin: 0; min-height: 48px;">Add</button>
-                    </div>
-                </div>
-
-                <div class="divider"></div>
-
-                <div class="btn-group" style="flex-wrap: wrap; gap: 8px;">
-                    <button id="save-btn" class="primary-btn" style="flex: 1; min-width: 45%;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        Save Config
+                <div class="frost-actions">
+                    <button id="save-btn" class="frost-btn primary">
+                        <span class="btn-shimmer"></span>
+                        <span class="btn-text">Commit</span>
                     </button>
-                    <button id="reset-btn" class="secondary-btn" style="flex: 1; min-width: 45%;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="1 4 1 10 7 10" />
-                            <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
-                        </svg>
-                        Reset All
+                    <button id="reset-btn" class="frost-btn ghost">
+                        <span class="btn-text">Purge</span>
                     </button>
                 </div>
             </div>
 
-            <footer>
-                <div class="status-row">
-                    <div class="status-indicator">
-                        <span class="status-dot"></span>
-                        <span id="status" class="status-text">Active</span>
+            <!-- ITEMS TAB -->
+            <div class="frost-panel" id="panel-items">
+                <div class="frost-field">
+                    <label class="frost-label">
+                        <span class="label-mark">+</span>
+                        Inject Asset
+                    </label>
+                    <div class="frost-input-wrap dual">
+                        <input type="number" id="manual-item-id" placeholder="Asset ID">
+                        <button id="add-item-btn" class="frost-btn slim">Add</button>
                     </div>
-                    <span class="footer-hint">Extension is running</span>
                 </div>
-            </footer>
-        </div>
+
+                <div class="frost-divider">
+                    <span class="divider-ice"></span>
+                </div>
+
+                <div class="inventory-vault">
+                    <div class="vault-header">
+                        <span class="vault-title">Simulated Inventory</span>
+                        <span class="vault-count" id="inv-count">0 items</span>
+                    </div>
+                    <div class="vault-grid" id="inventory-preview-grid"></div>
+                </div>
+            </div>
+
+            <!-- LEDGER TAB -->
+            <div class="frost-panel" id="panel-ledger">
+                <div class="frost-field">
+                    <label class="frost-label">
+                        <span class="label-mark">$</span>
+                        New Entry
+                    </label>
+                    <div class="ledger-form">
+                        <input type="text" id="tx-desc" placeholder="Description">
+                        <input type="text" id="tx-type" placeholder="Type" value="Purchase">
+                        <div class="ledger-row">
+                            <input type="number" id="tx-amount" placeholder="Amount">
+                            <input type="date" id="tx-date">
+                        </div>
+                        <button id="add-tx-btn" class="frost-btn slim wide">Record</button>
+                    </div>
+                </div>
+
+                <div class="frost-divider">
+                    <span class="divider-ice"></span>
+                </div>
+
+                <div class="ledger-scroll">
+                    <div class="ledger-header">
+                        <span>Transaction Log</span>
+                    </div>
+                    <div class="ledger-entries" id="transaction-list"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="frost-footer">
+            <div class="footer-left">
+                <span class="status-crystal" id="status-bulb"></span>
+                <span class="status-word" id="status">ready</span>
+            </div>
+            <div class="footer-right">
+                <span class="frost-clock" id="clock">--:--:--</span>
+            </div>
+        </footer>
     </div>
     <script src="popup.js"></script>
 </body>
 </html>
+

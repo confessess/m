@@ -2,12 +2,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const robuxInput = document.getElementById('robux-amount');
     const saveBtn = document.getElementById('save-btn');
     const resetBtn = document.getElementById('reset-btn');
-    const status = document.getElementById('status');
+    const statusText = document.getElementById('status');
+    const statusBulb = document.getElementById('status-bulb');
     const addItemIdInput = document.getElementById('manual-item-id');
     const addItemBtn = document.getElementById('add-item-btn');
     const displayNameInput = document.getElementById('display-name');
     const usernameInput = document.getElementById('username');
     const followerInput = document.getElementById('follower-count');
+    const invCount = document.getElementById('inv-count');
+    const invGrid = document.getElementById('inventory-preview-grid');
 
     const txList = document.getElementById('transaction-list');
     const txDesc = document.getElementById('tx-desc');
@@ -18,10 +21,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (txDate) txDate.valueAsDate = new Date();
 
-    function showStatus(text) {
-        const originalText = status.textContent;
-        status.textContent = text;
-        setTimeout(() => { status.textContent = originalText; }, 2000);
+    // Clock
+    function updateClock() {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        const clock = document.getElementById('clock');
+        if (clock) clock.textContent = `${h}:${m}:${s}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Tab switching
+    document.querySelectorAll('.frost-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.frost-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.frost-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            const panelId = 'panel-' + tab.dataset.tab;
+            const panel = document.getElementById(panelId);
+            if (panel) panel.classList.add('active');
+        });
+    });
+
+    function showStatus(text, type = 'ready') {
+        statusText.textContent = text;
+        if (type === 'error') {
+            statusBulb.style.background = 'var(--frost-danger)';
+            statusBulb.style.boxShadow = '0 0 6px var(--frost-danger)';
+        } else if (type === 'success') {
+            statusBulb.style.background = 'var(--frost-success)';
+            statusBulb.style.boxShadow = '0 0 6px var(--frost-success)';
+        } else {
+            statusBulb.style.background = 'var(--frost-success)';
+            statusBulb.style.boxShadow = '0 0 6px var(--frost-success)';
+        }
+        setTimeout(() => {
+            statusText.textContent = 'ready';
+            statusBulb.style.background = 'var(--frost-success)';
+            statusBulb.style.boxShadow = '0 0 6px var(--frost-success)';
+        }, 2000);
+    }
+
+    function renderInventoryPreview(inventory) {
+        if (!invGrid) return;
+        invGrid.innerHTML = '';
+        const items = (inventory || []).slice(0, 16);
+        if (invCount) invCount.textContent = (inventory || []).length + ' items';
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'vault-item';
+            if (item.image) {
+                div.innerHTML = `<img src="${item.image}" alt="">`;
+            } else {
+                div.innerHTML = `<span style="color:var(--frost-text-dim);font-size:0.6rem;">?</span>`;
+            }
+            invGrid.appendChild(div);
+        });
     }
 
     function renderTransactions(transactions) {
@@ -30,42 +87,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
         sorted.forEach((t, i) => {
             const div = document.createElement('div');
-            div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px;font-size:0.75rem;';
-            const amountColor = t.amount >= 0 ? '#34d399' : '#ef4444';
+            div.className = 'ledger-entry';
+            const amountColor = t.amount >= 0 ? 'pos' : 'neg';
+            const sign = t.amount >= 0 ? '+' : '';
             div.innerHTML = `
-                <div style="display:flex;flex-direction:column;gap:2px;overflow:hidden;flex:1;min-width:0;">
-                    <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.description}</span>
-                    <span style="color:var(--text-dim);font-size:0.65rem;">${t.type} • ${new Date(t.date).toLocaleDateString()}</span>
+                <div>
+                    <div class="entry-desc">${t.description}</div>
+                    <div class="entry-meta">${t.type} • ${new Date(t.date).toLocaleDateString()}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                    <span style="color:${amountColor};font-weight:700;">${t.amount >= 0 ? '+' : ''}${parseInt(t.amount).toLocaleString()}</span>
-                    <button class="del-tx" data-idx="${i}" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:2px 4px;font-size:0.9rem;line-height:1;">×</button>
-                </div>
+                <div class="entry-amount ${amountColor}">${sign}${parseInt(t.amount).toLocaleString()}</div>
             `;
             txList.appendChild(div);
         });
-        txList.querySelectorAll('.del-tx').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const idx = parseInt(e.target.dataset.idx);
-                chrome.storage.local.get(['transactions'], (res) => {
-                    const txs = res.transactions || [];
-                    const sorted = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date));
-                    sorted.splice(idx, 1);
-                    chrome.storage.local.set({ transactions: sorted }, () => {
-                        renderTransactions(sorted);
-                        showStatus('Removed');
-                    });
-                });
-            });
-        });
     }
 
-    chrome.storage.local.get(['fakeRobux', 'larpId', 'uiMode', 'transactions', 'larpDisplayName', 'larpUsername', 'larpFollowers'], (result) => {
+    chrome.storage.local.get(['fakeRobux', 'larpId', 'uiMode', 'transactions', 'larpDisplayName', 'larpUsername', 'larpFollowers', 'inventory'], (result) => {
         if (result.fakeRobux !== undefined) robuxInput.value = result.fakeRobux;
         if (result.larpDisplayName !== undefined && displayNameInput) displayNameInput.value = result.larpDisplayName;
         if (result.larpUsername !== undefined && usernameInput) usernameInput.value = result.larpUsername;
         if (result.larpFollowers !== undefined && followerInput) followerInput.value = result.larpFollowers;
         renderTransactions(result.transactions || []);
+        renderInventoryPreview(result.inventory || []);
     });
 
     saveBtn.addEventListener('click', () => {
@@ -81,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
             larpUsername: username,
             larpFollowers: followers
         }, () => {
-            showStatus('Changes Saved!');
+            showStatus('committed', 'success');
         });
     });
 
@@ -91,14 +133,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const type = txType.value;
         const amount = parseInt(txAmount.value);
         const date = txDate.value || new Date().toISOString().split('T')[0];
-        if (!desc || isNaN(amount)) { showStatus('Fill all fields'); return; }
+        if (!desc || isNaN(amount)) { showStatus('incomplete', 'error'); return; }
         chrome.storage.local.get(['transactions'], (res) => {
             const txs = res.transactions || [];
             txs.push({ id: Math.random().toString(36).substr(2,9), description: desc, type, amount, date });
             chrome.storage.local.set({ transactions: txs }, () => {
                 txDesc.value = ''; txAmount.value = ''; txDate.valueAsDate = new Date();
                 renderTransactions(txs);
-                showStatus('Transaction Added');
+                showStatus('recorded', 'success');
             });
         });
     });
@@ -106,14 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
     addItemBtn.addEventListener('click', async () => {
         const assetId = addItemIdInput.value.trim();
         if (!assetId) return;
-        showStatus('Adding...');
+        showStatus('fetching...');
         addItemBtn.disabled = true;
         try {
             let detailRes = await fetch(`https://economy.roblox.com/v2/assets/${assetId}/details`);
             if (!detailRes.ok) {
                 const bundleRes = await fetch(`https://catalog.roblox.com/v1/bundles/${assetId}/details`);
                 if (bundleRes.ok) {
-                    showStatus('Adding Bundle...');
+                    showStatus('bundle...');
                     const bundleData = await bundleRes.json();
                     if (bundleData.items && bundleData.items.length > 0) {
                         const assets = bundleData.items.filter(item => item.type === "Asset");
@@ -125,15 +167,40 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const thumbData = await thumbRes.json();
                                 (thumbData.data || []).forEach(t => { thumbsMap[t.targetId] = t.imageUrl; });
                             }
+
+                            const assetTypePromises = assets.map(async (item) => {
+                                try {
+                                    const typeRes = await fetch(`https://economy.roblox.com/v2/assets/${item.id}/details`);
+                                    if (typeRes.ok) {
+                                        const typeData = await typeRes.json();
+                                        return { id: item.id, assetType: typeData.AssetTypeId };
+                                    }
+                                } catch (e) {}
+                                return { id: item.id, assetType: null };
+                            });
+                            const assetTypes = await Promise.all(assetTypePromises);
+                            const assetTypeMap = {};
+                            assetTypes.forEach(at => { assetTypeMap[at.id] = at.assetType; });
+
                             chrome.storage.local.get(['inventory'], (result) => {
                                 const inventory = result.inventory || [];
                                 for (const item of assets) {
-                                    inventory.push({ name: item.name, image: thumbsMap[item.id] || "", creator: bundleData.creator?.name || "Roblox", date: new Date().toISOString(), id: Math.random().toString(36).substr(2,9), assetId: item.id.toString(), limitedStatus: null, assetType: item.type });
+                                    inventory.push({ 
+                                        name: item.name, 
+                                        image: thumbsMap[item.id] || "", 
+                                        creator: bundleData.creator?.name || "Roblox", 
+                                        date: new Date().toISOString(), 
+                                        id: Math.random().toString(36).substr(2,9), 
+                                        assetId: item.id.toString(), 
+                                        limitedStatus: null, 
+                                        assetType: assetTypeMap[item.id] || null 
+                                    });
                                 }
                                 chrome.storage.local.set({ inventory }, () => {
                                     addItemIdInput.value = '';
-                                    showStatus('Bundle Added!');
+                                    showStatus('bundle added', 'success');
                                     addItemBtn.disabled = false;
+                                    renderInventoryPreview(inventory);
                                 });
                             });
                             return;
@@ -154,29 +221,41 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (data.IsLimited) limitedStatus = 'limited';
             chrome.storage.local.get(['inventory'], (result) => {
                 const inventory = result.inventory || [];
-                inventory.push({ name: data.Name || data.name || "Roblox Item", image: imageUrl, creator: data.Creator?.Name || "Roblox", date: new Date().toISOString(), id: Math.random().toString(36).substr(2,9), assetId: assetId, limitedStatus: limitedStatus, assetType: data.AssetTypeId });
+                inventory.push({ 
+                    name: data.Name || data.name || "Roblox Item", 
+                    image: imageUrl, 
+                    creator: data.Creator?.Name || "Roblox", 
+                    date: new Date().toISOString(), 
+                    id: Math.random().toString(36).substr(2,9), 
+                    assetId: assetId, 
+                    limitedStatus: limitedStatus, 
+                    assetType: data.AssetTypeId 
+                });
                 chrome.storage.local.set({ inventory }, () => {
                     addItemIdInput.value = '';
-                    showStatus('Item Added!');
+                    showStatus('item added', 'success');
                     addItemBtn.disabled = false;
+                    renderInventoryPreview(inventory);
                 });
             });
         } catch (e) {
-            showStatus('Failed API Check');
+            showStatus('failed', 'error');
             console.error(e);
             addItemBtn.disabled = false;
         }
     });
 
     resetBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to reset all simulated data?')) {
+        if (confirm('Purge all simulated data?')) {
             chrome.storage.local.remove(['fakeRobux', 'inventory', 'history', 'equipped', 'transactions', 'larpDisplayName', 'larpUsername', 'larpFollowers'], () => {
                 robuxInput.value = 10000000;
                 if (displayNameInput) displayNameInput.value = '';
                 if (usernameInput) usernameInput.value = '';
                 if (followerInput) followerInput.value = '';
                 if (txList) txList.innerHTML = '';
-                showStatus('Reset Complete');
+                if (invGrid) invGrid.innerHTML = '';
+                if (invCount) invCount.textContent = '0 items';
+                showStatus('purged', 'success');
             });
         }
     });
