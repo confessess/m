@@ -35,6 +35,16 @@
     const isMeOrUnknown = (u) => !cfg.myId || isMe(u);
     const isSelfId = (id) => cfg.myId != null && String(id) === String(cfg.myId);
 
+    /* ── unmatched-URL radar: tells you which endpoint needs a rule ── */
+    const _unseen = new Set();
+    function logUnmatched(url) {
+        if (!/avatar|wear|profile|description|membership|badge|premium|plus|thumbnails/i.test(url)) return;
+        const key = url.split('?')[0];
+        if (_unseen.has(key)) return;
+        _unseen.add(key);
+        console.log('[LarpBlox] UNMATCHED →', url);
+    }
+
     function rename(o) {
         if (!o || typeof o !== 'object') return false;
         let c = false;
@@ -70,6 +80,8 @@
     }
 
     function applyAvatarDefinition(j) {
+        if (!j || typeof j !== 'object') return false;
+
         if (cfg.replaceAssets && cfg.targetAssets.length) {
             j.assets = cfg.targetAssets.map((a) => ({
                 id: a.id, name: a.name,
@@ -81,6 +93,7 @@
             if (cfg.targetAvatarType) j.playerAvatarType = cfg.targetAvatarType;
             return true;
         }
+
         let c = false;
         if (cfg.equippedIds && cfg.equippedIds.length) {
             const have = new Set((j.assets || []).map((a) => a.id));
@@ -90,6 +103,24 @@
         }
         if (cfg.bodyColors) { j.bodyColors = { ...j.bodyColors, ...cfg.bodyColors }; c = true; }
         return c;
+    }
+
+    function applyMembership(j) {
+        if (cfg.premium == null) return null;
+        if (typeof j === 'boolean') return j === cfg.premium ? null : cfg.premium;
+        if (j && typeof j === 'object') {
+            let c = false;
+            for (const k of ['isPremium', 'premium', 'isPlus', 'plus', 'hasPlus', 'isPlusMember', 'isSubscribed']) {
+                if (k in j && j[k] !== cfg.premium) { j[k] = cfg.premium; c = true; }
+            }
+            const mt = j.membershipType;
+            if (typeof mt === 'string' && cfg.premium) {
+                const isNone = /none|free/i.test(mt);
+                if (isNone) { j.membershipType = 'Plus'; c = true; }
+            }
+            return c ? j : null;
+        }
+        return null;
     }
 
     const RULES = [
@@ -122,8 +153,21 @@
             }
         },
         {
-            match: /^https:\/\/apis\.roblox\.com\/user-profile-api\/v1\/user\/profiles\/get-profiles/,
-            rewrite(j) { return renameInList(j.profiles || j.data, 'profile') ? j : null; }
+            /* new profile layout: bio + identity live here, and the field is not always "description" */
+            match: /^https:\/\/apis\.roblox\.com\/user-profile-api\/v\d+\/user\/profiles\/get-profiles/,
+            rewrite(j) {
+                const list = j.profiles || j.data;
+                if (!Array.isArray(list)) return null;
+                let c = false;
+                for (const p of list) {
+                    if (!p) continue;
+                    if (cfg.bio != null && 'description' in p) { p.description = cfg.bio; c = true; }
+                    if (cfg.bio != null && 'bio' in p) { p.bio = cfg.bio; c = true; }
+                    if (cfg.bio != null && 'about' in p) { p.about = cfg.bio; c = true; }
+                    if (rename(p)) c = true;
+                }
+                return c ? j : null;
+            }
         },
         {
             match: /^https:\/\/users\.roblox\.com\/v1\/users\/search/,
@@ -131,15 +175,28 @@
         },
         {
             match: /^https:\/\/accountinformation\.roblox\.com\/v1\/users\/\d+\/roblox-badges/,
-            rewrite(j) { return cfg.badges ? (j = cfg.badges) : null; }
+            rewrite(j) {
+                if (!Array.isArray(j)) return null;
+                let out = cfg.badges ? cfg.badges.slice() : j.slice();
+                let c = !!cfg.badges;
+                const hasPlus = () => out.some((b) => /plus/i.test((b && b.name) || ''));
+                if (cfg.premium === true && !hasPlus()) {
+                    out.push({ id: 99, name: 'Roblox Plus', description: 'Roblox Plus subscriber', imageUrl: '' });
+                    c = true;
+                } else if (cfg.premium === false && hasPlus()) {
+                    out = out.filter((b) => !/plus/i.test((b && b.name) || ''));
+                    c = true;
+                }
+                return c ? out : null;
+            }
         },
         {
             match: /^https:\/\/accountinformation\.roblox\.com\/v1\/users\/\d+\/promotion-channels/,
             rewrite(j) { return cfg.socialLinks ? Object.assign(j, cfg.socialLinks) : null; }
         },
         {
-            match: /^https:\/\/premiumfeatures\.roblox\.com\/v1\/users\/\d+\/validate-membership/,
-            rewrite(j) { return cfg.premium == null ? null : cfg.premium; }
+            match: /validate-membership|premium-membership|memberships-api|plus\.roblox\.com/i,
+            rewrite(j) { return applyMembership(j); }
         },
         {
             match: /^https:\/\/groups\.roblox\.com\/v1\/users\/\d+\/groups\/primary\/role/,
@@ -201,6 +258,11 @@
             }
         },
         {
+            /* v4 shape used by the current profile page — "avatar" is followed by "/users/{id}" */
+            match: /^https:\/\/avatar\.roblox\.com\/v4\/avatar\/users\/\d+/,
+            rewrite(j, url) { return isMe(url) && applyAvatarDefinition(j) ? j : null; }
+        },
+        {
             match: /^https:\/\/avatar\.roblox\.com\/v[14]\/(?:users\/\d+\/)?avatar(?:[?#]|$)/,
             rewrite(j, url) {
                 const bare = /\/avatar(?:[?#]|$)/.test(url) && !/\/users\//.test(url);
@@ -255,7 +317,7 @@
         if (!cfg.enabled) return res;
         const url = input instanceof Request ? input.url : String(input);
         const rule = matchRule(url);
-        if (!rule) return res;
+        if (!rule) { logUnmatched(url); return res; }
         try {
             const json = await res.clone().json();
             const next = rule.rewrite(json, url);
@@ -274,6 +336,7 @@
     XHRp.open = function (method, url) {
         this.__larpUrl = String(url);
         this.__larpCache = undefined;
+        if (cfg.enabled && !matchRule(this.__larpUrl)) logUnmatched(this.__larpUrl);
         const self = this;
         Object.defineProperty(self, 'responseText', {
             configurable: true,
@@ -314,5 +377,5 @@
         } else setTimeout(patchService, 500);
     })();
 
-    console.log('[LarpBlox] hook armed v1.5');
+    console.log('[LarpBlox] hook armed v1.6');
 })();

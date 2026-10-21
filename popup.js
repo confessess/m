@@ -101,16 +101,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     );
 
+    // ── FIX: empty Robux box used to abort the whole save ──
     saveBtn.addEventListener('click', () => {
-        const amount = parseInt(robuxInput.value);
-        const displayName = displayNameInput ? displayNameInput.value.trim() : '';
-        const username = usernameInput ? usernameInput.value.trim() : '';
-        const followers = followerInput ? parseInt(followerInput.value) || 0 : 0;
-        if (isNaN(amount) && amount !== undefined) return;
-        chrome.storage.local.set({
-            fakeRobux: amount, setFakeRobux: amount,
-            larpDisplayName: displayName, larpUsername: username, larpFollowers: followers
-        }, () => showStatus('committed', 'success'));
+        const raw = robuxInput.value.trim();
+        const amount = raw === '' ? undefined : parseInt(raw);
+        if (amount !== undefined && isNaN(amount)) { showStatus('bad amount', 'error'); return; }
+
+        const patch = {
+            larpDisplayName: displayNameInput ? displayNameInput.value.trim() : '',
+            larpUsername: usernameInput ? usernameInput.value.trim() : '',
+            larpFollowers: followerInput ? (parseInt(followerInput.value) || 0) : 0
+        };
+        if (amount !== undefined) { patch.fakeRobux = amount; patch.setFakeRobux = amount; }
+
+        chrome.storage.local.set(patch, () => showStatus('committed', 'success'));
     });
 
     addTxBtn.addEventListener('click', () => {
@@ -212,12 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
         bio: document.getElementById('opt-bio'),
         followers: document.getElementById('opt-followers'),
         outfit: document.getElementById('opt-outfit'),
-        badges: document.getElementById('opt-badges')
+        badges: document.getElementById('opt-badges'),
+        plus: document.getElementById('opt-plus')
     };
     let target = null;
 
     const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    const jget = (url) => fetch(url).then(r => r.json());
+    const jget = (url) => fetch(url, { credentials: 'include' }).then(r => r.json());
 
     async function resolveUser(username) {
         const clean = username.trim().replace(/^@/, '');
@@ -239,13 +244,45 @@ document.addEventListener('DOMContentLoaded', () => {
         return hit;
     }
 
+    // ── Plus detection across every endpoint shape we know of ──
+    function readBool(j) {
+        if (typeof j === 'boolean') return j;
+        if (j && typeof j === 'object') {
+            for (const k of ['isPremium', 'premium', 'isPlus', 'plus', 'hasPlus', 'isPlusMember', 'isSubscribed']) {
+                if (typeof j[k] === 'boolean') return j[k];
+            }
+            const mt = j.membershipType ?? j.tier;
+            if (typeof mt === 'string') return !/none|free/i.test(mt);
+            if (typeof mt === 'number') return mt > 0;
+        }
+        return null;
+    }
+
+    async function detectPlus(id, badges) {
+        if (Array.isArray(badges) && badges.some(b => /plus/i.test((b && b.name) || ''))) return true;
+        const urls = [
+            `https://premiumfeatures.roblox.com/v1/users/${id}/validate-membership`,
+            `https://apis.roblox.com/premium-membership-api/v1/users/${id}`,
+            `https://apis.roblox.com/memberships-api/v1/users/${id}/membership`
+        ];
+        for (const u of urls) {
+            try {
+                const r = await fetch(u, { credentials: 'include' });
+                if (!r.ok) continue;
+                const v = readBool(await r.json());
+                if (v !== null) return v;
+            } catch (e) { }
+        }
+        return null;
+    }
+
     function renderTargetPreview() {
         if (!target) { tPreview.innerHTML = '<div class="target-empty">no target</div>'; return; }
         tPreview.innerHTML = `
             <div class="target-card">
                 ${target.thumb ? `<img class="target-avatar" src="${esc(target.thumb)}" alt="">` : '<div class="target-avatar"></div>'}
                 <div class="target-meta">
-                    <div class="target-name">${esc(target.displayName)}</div>
+                    <div class="target-name">${esc(target.displayName)}${target.plus ? ' <span class="target-plus">Ⓟ</span>' : ''}</div>
                     <div class="target-handle">@${esc(target.name)}</div>
                     <div class="target-stats">${(target.followers || 0).toLocaleString()} followers · ${(target.friends || []).length} friends</div>
                     ${target.description ? `<div class="target-bio">${esc(target.description)}</div>` : ''}
@@ -260,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const hit = await resolveUser(username);
             const id = hit.id;
             const [profile, followers, followings, friends, avatar, thumb, headshot, bust,
-                   badges, socialLinks, premium, primaryGroup, usernameHistory, friendsList, presence] = await Promise.all([
+                   badges, socialLinks, primaryGroup, usernameHistory, friendsList, presence] = await Promise.all([
                 jget(`https://users.roblox.com/v1/users/${id}`).catch(() => ({})),
                 jget(`https://friends.roblox.com/v1/users/${id}/followers/count`).catch(() => ({ count: 0 })),
                 jget(`https://friends.roblox.com/v1/users/${id}/followings/count`).catch(() => ({ count: 0 })),
@@ -271,7 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 jget(`https://thumbnails.roblox.com/v1/users/avatar-bust?userIds=${id}&size=420x420&format=Png&isCircular=false`).then(j => j.data?.[0]?.imageUrl).catch(() => null),
                 jget(`https://accountinformation.roblox.com/v1/users/${id}/roblox-badges`).catch(() => null),
                 jget(`https://accountinformation.roblox.com/v1/users/${id}/promotion-channels`).catch(() => null),
-                jget(`https://premiumfeatures.roblox.com/v1/users/${id}/validate-membership`).catch(() => null),
                 jget(`https://groups.roblox.com/v1/users/${id}/groups/primary/role`).catch(() => null),
                 jget(`https://users.roblox.com/v1/users/${id}/username-history`).catch(() => null),
                 jget(`https://friends.roblox.com/v1/users/${id}/friends?limit=50`).catch(() => ({})),
@@ -282,6 +318,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).then(r => r.json()).catch(() => ({}))
             ]);
 
+            const plus = await detectPlus(id, badges);
+
             target = {
                 id,
                 name: profile.name || hit.name,
@@ -289,7 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 description: profile.description || '',
                 created: profile.created || null,
                 hasVerifiedBadge: !!profile.hasVerifiedBadge,
-                premium: !!premium,
+                premium: plus === true,
+                plus: plus,
                 followers: followers.count ?? 0,
                 followings: followings.count ?? 0,
                 friendsCount: friends.count ?? 0,
@@ -307,9 +346,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 friends: (friendsList && friendsList.data) || null,
                 presence: (presence.userPresences || [])[0] || null
             };
+            if (tOpts.plus) tOpts.plus.checked = plus !== false;
+
             renderTargetPreview();
             tApply.disabled = false;
-            showStatus('target loaded', 'success');
+            showStatus(plus === null ? 'loaded (plus?)' : 'target loaded', 'success');
         } catch (e) {
             target = null;
             tApply.disabled = true;
@@ -325,28 +366,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tApply.addEventListener('click', () => {
         if (!target) return;
-        const patch = { larpTarget: target };
-        if (tOpts.name.checked) {
-            patch.larpDisplayName = target.displayName;
-            patch.larpUsername = target.name;
+
+        // every checkbox is now explicit in BOTH directions, so unticking actually clears
+        const on = (el, dflt = true) => (el ? el.checked : dflt);
+
+        if (on(tOpts.name)) {
+            target.displayName = target.displayName;
         }
-        if (tOpts.followers.checked) {
+        const patch = {};
+
+        patch.larpDisplayName = on(tOpts.name) ? target.displayName : '';
+        patch.larpUsername = on(tOpts.name) ? target.name : '';
+        patch.larpBio = on(tOpts.bio) ? target.description : null;
+
+        if (on(tOpts.followers)) {
             patch.larpFollowers = target.followers;
             patch.larpFollowing = target.followings;
             patch.larpFriends = target.friendsCount;
+        } else {
+            patch.larpFollowers = null;
+            patch.larpFollowing = null;
+            patch.larpFriends = null;
         }
-        if (tOpts.bio.checked) patch.larpBio = target.description;
-        if (tOpts.outfit.checked) {
+
+        // outfit is the MASTER SWITCH: larpId is what arms replaceAssets in bridge.js
+        if (on(tOpts.outfit)) {
             patch.larpId = target.id;
             patch.larpBodyColors = null;
+        } else {
+            patch.larpId = null;
         }
+
+        if (!on(tOpts.badges)) target.badges = null;
+        target.hasVerifiedBadge = on(tOpts.badges) ? !!target.hasVerifiedBadge : false;
+
+        // Plus: drives both the DOM badge and the membership API rewrite
+        const wantPlus = on(tOpts.plus, target.premium === true);
+        target.premium = wantPlus;
+        target.plus = wantPlus;
+        patch.larpPlus = wantPlus;
+
+        patch.larpTarget = target;
+
         chrome.storage.local.set(patch, () => showStatus('larping', 'success'));
     });
 
     tClear.addEventListener('click', () => {
         chrome.storage.local.remove(
             ['larpTarget', 'larpBio', 'larpId', 'larpDisplayName', 'larpUsername',
-             'larpFollowers', 'larpFollowing', 'larpFriends', 'larpBodyColors'],
+             'larpFollowers', 'larpFollowing', 'larpFriends', 'larpBodyColors', 'larpPlus'],
             () => {
                 target = null;
                 tUser.value = '';
@@ -361,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (r.larpTarget) {
             target = r.larpTarget;
             tUser.value = target.name;
+            if (tOpts.plus && (target.plus || target.premium)) tOpts.plus.checked = true;
             renderTargetPreview();
             tApply.disabled = false;
         } else {
@@ -373,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.local.remove(
             ['fakeRobux', 'setFakeRobux', 'inventory', 'history', 'equipped', 'transactions',
              'larpDisplayName', 'larpUsername', 'larpFollowers', 'larpFollowing', 'larpFriends',
-             'larpBio', 'larpTarget', 'larpId', 'larpBodyColors'],
+             'larpBio', 'larpTarget', 'larpId', 'larpBodyColors', 'larpPlus'],
             () => {
                 robuxInput.value = 10000000;
                 [displayNameInput, usernameInput, followerInput].forEach(el => { if (el) el.value = ''; });

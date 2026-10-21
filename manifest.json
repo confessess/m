@@ -47,7 +47,7 @@
                 "js/follower_spoofer.js",
                 "js/larp_target.js",
                 "content.js"
-            ],
+            ],  
             "run_at": "document_end",
             "all_frames": true
         }
