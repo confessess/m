@@ -314,5 +314,5 @@
         } else setTimeout(patchService, 500);
     })();
 
-    console.log('[LarpBlox] hook armed v1.4');
+    console.log('[LarpBlox] hook armed v1.5');
 })();
